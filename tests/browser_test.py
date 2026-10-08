@@ -21,6 +21,7 @@ window.supabase={createClient:()=>({
  resetPasswordForEmail:async email=>{window.mockReset=email;return {error:null}},
  updateUser:async data=>{window.mockPassword=data.password;return {error:null}},
  signOut:async()=>{session=null;listener('SIGNED_OUT',null);return {error:null}}},
+ rpc:async name=>{window.mockRPC=name;window.mockRows.organization_members=[{organization_id:'business-org',user_id:'admin-user',role:'owner'}];return {data:'business-org',error:null}},
  from:table=>{let op='select',payload,filters=[],one=false,start=0,end=Infinity,ignoreDuplicates=false;
  const q={select(){return q},eq(k,v){filters.push([k,v]);return q},is(k,v){filters.push([k,v]);return q},order(){return q},range(a,b){start=a;end=b;return q},insert(p){op='insert';payload=p;return q},upsert(p,options){op='upsert';payload=p;ignoreDuplicates=options.ignoreDuplicates;return q},update(p){op='update';payload=p;return q},single(){one=true;return q},maybeSingle(){one=true;return q},
  then(resolve){let rows=window.mockRows[table]||[];let result;
@@ -37,7 +38,7 @@ window.supabase={createClient:()=>({
 
 def fixture(empty=False):
     org='business-org'
-    tables=['clients','service_plans','visits','visit_reports','jobs','invoices','payments','expenses','accounts','owner_capital','vendors','vendor_bills','vendor_payments','erp_records']
+    tables=['clients','service_plans','visits','visit_reports','jobs','invoices','payments','expenses','accounts','owner_capital','vendors','vendor_bills','vendor_payments','erp_records','historical_billing']
     rows={t:[] for t in tables}
     rows['organization_members']=[dict(user_id='admin-user',organization_id=org,role='owner')]
     rows['accounts']=[dict(id='account-'+name,name=name,type=name,opening='0',organization_id=org) for name in ['UPI / Wallet','Petty Cash','Bank','Cash']]
@@ -72,8 +73,10 @@ class BrowserTests(unittest.TestCase):
         self.page.on('dialog',lambda d:d.accept('Treatment completed' if d.type=='prompt' else None))
     def tearDown(self):
         self.context.close()
-    def load(self,empty=False):
-        self.page.add_init_script('window.mockRows='+json.dumps(fixture(empty))+';')
+    def load(self,empty=False,bootstrap=False):
+        rows=fixture(empty)
+        if bootstrap: rows['organization_members']=[]
+        self.page.add_init_script('window.mockRows='+json.dumps(rows)+';')
         self.page.route('https://cdn.jsdelivr.net/**',lambda route:route.fulfill(status=200,content_type='application/javascript',body=MOCK))
         self.page.goto(f'http://127.0.0.1:{self.server.server_port}/')
         self.page.wait_for_function('cloudReady')
@@ -269,6 +272,26 @@ class BrowserTests(unittest.TestCase):
         self.page.evaluate("ERP.createInvoice(1,'2026-09','2026-10-08');saveData()")
         self.page.wait_for_function('!cloudDirty')
         self.assertEqual(self.page.evaluate('invoices[2].no'),'APC/2026-27/0003')
+        self.assertEqual(self.errors,[])
+
+    def test_missing_membership_uses_protected_bootstrap_rpc(self):
+        self.load(empty=True,bootstrap=True)
+        self.assertEqual(self.page.evaluate('mockRPC'),'bootstrap_aahana_workspace')
+        self.assertEqual(self.errors,[])
+
+    def test_historical_billing_preserves_values_and_does_not_post_cash(self):
+        self.load()
+        self.page.evaluate("""() => {
+          historicalBills=[{id:'00000000-0000-4000-8000-000000000099',client:1,source_key:'Billing 26-27!2',payload:{cells:[{header:'GST',original_value:226},{header:'Notes',original_value:'<img src=x onerror=window.pwned=1>'}],reported_billing:{client_site:'Historical client',source_financial_year:'26-27',original_invoice_number:'UT/25-26/01',service_month:'2026-04',invoice_date:null,taxable_recorded:1250,gst_recorded:226,total_recorded:1475,payment_status_recorded:'Received',payment_date_recorded:null,gst_status_recorded:'Submitted',review_issues:['Amount mismatch']}}}];renderAll();
+        }""")
+        self.page.get_by_role('button',name='Historical billing',exact=True).click()
+        self.assertIn('UT/25-26/01',self.page.locator('#historicalBilling').inner_text())
+        self.assertIn('1,475',self.page.locator('#historicalBilling').inner_text())
+        self.assertEqual(self.page.evaluate('payments.length'),0)
+        self.page.get_by_role('button',name='Source details',exact=True).click()
+        self.assertIn('226',self.page.locator('#modalBody').inner_text())
+        self.assertEqual(self.page.locator('#modalBody img').count(),0)
+        self.assertIsNone(self.page.evaluate('window.pwned'))
         self.assertEqual(self.errors,[])
 
     def billing_setup(self):

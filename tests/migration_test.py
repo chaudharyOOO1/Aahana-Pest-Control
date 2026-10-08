@@ -15,6 +15,9 @@ def psql(sql):
 bootstrap="""
 create role authenticated;
 create role anon;
+create schema auth;
+create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.user_id',true),'')::uuid$$;
 create table organizations(id uuid primary key);
 create table organization_members(organization_id uuid,user_id uuid);
 create function is_org_member(target_org uuid) returns boolean language sql stable security invoker set search_path=public as $$
@@ -55,6 +58,19 @@ try:
     else:raise RuntimeError('Disposable Postgres did not start')
     psql(bootstrap)
     for file in sorted((ROOT/'supabase/migrations').glob('*.sql')):psql(file.read_text())
+    run(['exec',name,'createdb','-U','postgres','aahana_fresh'])
+    def fresh(sql):return run(['exec','-i',name,'psql','-U','postgres','-d','aahana_fresh','-v','ON_ERROR_STOP=1'],sql).stdout
+    fresh("create schema auth;create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('test.user_id',true),'')::uuid$$;")
+    fresh('grant usage on schema auth to authenticated;')
+    for file in sorted((ROOT/'supabase/migrations').glob('*.sql')):fresh(file.read_text())
+    fresh("insert into auth.users values('00000000-0000-4000-8000-000000000003','admin@aahanapestcontrol.com',now()),('00000000-0000-4000-8000-000000000009','other@example.test',now());set role authenticated;set test.user_id='00000000-0000-4000-8000-000000000003';select public.bootstrap_aahana_workspace();select public.bootstrap_aahana_workspace();do $$begin if (select count(*) from public.organization_members)<>1 or (select count(*) from public.accounts)<>4 then raise exception 'Bootstrap duplicates';end if;end $$;")
+    fresh("set role authenticated;set test.user_id='00000000-0000-4000-8000-000000000009';do $$begin begin perform public.bootstrap_aahana_workspace();raise exception 'Unauthorized bootstrap accepted';exception when raise_exception then if SQLERRM<>'Verified Aahana administrator required' then raise;end if;end;end $$;")
+    import_file=Path(os.environ['AAHANA_PRIVATE_IMPORT_SQL']) if os.environ.get('AAHANA_PRIVATE_IMPORT_SQL') else None
+    if import_file is not None and import_file.exists():
+        fresh(import_file.read_text());fresh(import_file.read_text())
+        fresh("do $$begin if (select count(*) from public.historical_billing)<>185 or (select count(*) from public.clients)<>33 then raise exception 'Historical import mismatch or replay duplicates';end if;end $$;")
+        print('Private workbook import passed locally: 185 original rows, 33 linked clients, replay without duplicates.')
+    print('Fresh-project checks passed: complete schema, idempotent admin bootstrap and non-admin denial.')
     print(psql(checks))
     print(psql((ROOT/'tests/invoice_sequence_checks.sql').read_text()))
     concurrent_sql="""set role authenticated;

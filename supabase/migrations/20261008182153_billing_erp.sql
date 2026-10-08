@@ -1,3 +1,6 @@
+do $migration$ begin
+if to_regclass('public.organizations') is null then return;end if;
+execute $ddl$
 -- Apply only to the existing Aahana schema after backup and duplicate-receipt review.
 alter table public.clients add column if not exists billing_details jsonb not null default '{}'::jsonb;
 alter table public.invoices add column if not exists billing_details jsonb not null default '{}'::jsonb;
@@ -48,3 +51,5 @@ for each row execute function public.validate_aahana_payment();
 -- Invoice identity uniqueness is installed by the subsequent FY sequence migration.
 create unique index invoices_monthly_client_unique on public.invoices (organization_id,client_id,(billing_details->>'serviceMonth'))
 where billing_details->>'source' = 'monthly';
+
+$ddl$;end $migration$;

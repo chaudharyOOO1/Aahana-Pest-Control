@@ -1,3 +1,6 @@
+do $migration$ begin
+if to_regclass('public.organizations') is null then return;end if;
+execute $ddl$
 -- Historical invoice numbers stay exactly as issued; their actual invoice date
 -- determines the internal April–March financial year, independently of the prefix.
 create function public.aahana_financial_year(d date) returns text
@@ -74,3 +77,5 @@ end $$;
 revoke all on function aahana_private.preserve_invoice_identity() from public,anon,authenticated;
 create trigger aahana_preserve_invoice_identity before update on public.invoices
 for each row execute function aahana_private.preserve_invoice_identity();
+
+$ddl$;end $migration$;

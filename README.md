@@ -12,6 +12,7 @@ Operations and management accounting app with a static frontend and authenticate
 - Monthly P&L, cash flow, funds by account, balance-sheet reports, separate GST filings/payments and reviewed bank CSV imports.
 - Printable invoice/receipt summaries and shared calculations in integer paise.
 - GST, P&L and balance-sheet management summaries.
+- Read-only historical billing linked to clients, preserving source numbers, discrepancies and missing fields without creating unverified cash movements.
 - Organization-scoped cloud persistence, visible sync status, retry and recovery of unsynced browser changes.
 - Manual WhatsApp message preparation. Automated sending and incoming webhooks remain future work.
 
@@ -23,7 +24,7 @@ Serve this directory with `python -m http.server 8080` and open http://localhost
 
 app.js now targets the owner-supplied Aahana project `gvevmnzibhuqnpdfvidl` using its browser-safe publishable key. This is a configuration change; the new project schema, authentication and import still need setup through the correct connected Supabase account. Never include passwords, service-role keys or secret keys. Supabase RLS and the existing bootstrap Edge Function must enforce authorization; browser email restrictions are only a UI constraint.
 
-Apply the versioned billing ERP migration before deploying this frontend; setup and limits are in [docs/FINANCE.md](docs/FINANCE.md). The database must contain the 15 tables and membership policies described in PROJECT-WORK.md and the bootstrap-aahana-workspace Edge Function. Configure the deployed URL in Supabase Auth's allowed redirect URLs for password recovery. Create/confirm the fixed business-admin account through a trusted admin workflow. Public signup is disabled in this app.
+Apply the versioned billing ERP migration before deploying this frontend; setup and limits are in [docs/FINANCE.md](docs/FINANCE.md). The database must contain the 15 tables and membership policies described in PROJECT-WORK.md and the protected bootstrap_aahana_workspace RPC. The initialize_aahana migration creates the base schema for new empty projects and supplies the RPC. Configure the deployed URL in Supabase Auth's allowed redirect URLs for password recovery. Create/confirm the fixed business-admin account through a trusted admin workflow. Public signup is disabled in this app.
 
 Empty workspaces remain empty; demo records are not inserted automatically. Old ashna_pest_control_data_v1 caches are not imported automatically. Unsynced changes use a new user/organization-scoped cache and can be recovered at login with Retry sync. Only changed records are written. Compare-and-set checks preserve newer cloud edits; conflicts retain local changes for export and review. Refresh pulls cloud data when there are no pending local changes. Linked records sync in parent-first order, and client-generated UUIDs make interrupted inserts safe to retry.
 
