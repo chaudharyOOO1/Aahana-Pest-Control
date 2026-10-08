@@ -12,3 +12,6 @@ main{padding:28px;max-width:1450px;width:100%;margin:auto}.page-head{display:fle
 
 .sync-tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:10px 28px;border-bottom:1px solid var(--border);background:var(--surface)}
 @media(max-width:600px){.sync-tools{padding:10px 15px}.sync-tools .btn{font-size:12px;padding:7px 9px}}
+
+.financial-document{line-height:1.6}.financial-document .table{min-width:0}.modal{max-height:90vh;overflow:auto}
+@media print{body>*{display:none!important}body>#modal{display:block!important;position:static;background:white;padding:0}#modal .modal{width:100%;max-height:none;border:0;box-shadow:none;color:black;background:white}#modal .modal-head button,#modal .modal-foot{display:none!important}#modal .modal-body{display:block;padding:0}.financial-document .table{min-width:0} .financial-document th,.financial-document td{color:black}}

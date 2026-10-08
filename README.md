@@ -6,7 +6,8 @@ Static operations and management accounting app, recovered from the existing wor
 
 - Fixed admin sign-in, password recovery, sign-out and organization membership lookup.
 - Clients, service plans, scheduled visits, completion reports and jobs.
-- Invoices, collections, expenses, accounts, owner capital, vendors, supplier bills and payments.
+- Invoices, dated partial/full collections, exact receipt previews, expenses, accounts, owner capital, vendors, supplier bills and payments.
+- Printable invoice/receipt summaries and shared calculations in integer paise.
 - GST, P&L and balance-sheet management summaries.
 - Organization-scoped cloud persistence, visible sync status, retry and recovery of unsynced browser changes.
 - Manual WhatsApp message preparation. Automated sending and incoming webhooks remain future work.
@@ -27,6 +28,7 @@ Empty workspaces remain empty; demo records are not inserted automatically. Old 
 
 ```sh
 node --check app.js
+node tests/finance_test.cjs
 python -m pip install -r tests/requirements.txt
 python tests/browser_test.py
 ```
@@ -49,3 +51,7 @@ Repository: https://github.com/chaudharyOOO1/Aahana-Pest-Control.
 ## Sync behavior
 
 See docs/SYNC.md for record relationships, conflict recovery, and the distinction between source-code updates and business-data sync. Cloudflare and Vercel configuration will be addressed afterward; this repository workflow runs tests and does not deploy.
+
+## Finance workflow
+
+See docs/FINANCE.md for invoice and receipt validation, monthly/current report definitions, opening balance treatment, historical import preparation and the server checks required before deployment. Additional settings from a separate Codex chat must be provided before they can be replicated.
