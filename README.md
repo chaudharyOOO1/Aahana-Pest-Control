@@ -21,7 +21,7 @@ app.js uses the existing project URL and browser-safe publishable key. Never inc
 
 The database must contain the 15 tables and membership policies described in PROJECT-WORK.md and the bootstrap-aahana-workspace Edge Function. Configure the deployed URL in Supabase Auth's allowed redirect URLs for password recovery. Create/confirm the fixed business-admin account through a trusted admin workflow. Public signup is disabled in this app.
 
-Empty workspaces remain empty; demo records are not inserted automatically. Old ashna_pest_control_data_v1 caches are not imported automatically. Unsynced changes use a new user/organization-scoped cache and can be recovered at login with Retry sync. Simultaneous edits in multiple browsers can overwrite records; use one active editing session at a time.
+Empty workspaces remain empty; demo records are not inserted automatically. Old ashna_pest_control_data_v1 caches are not imported automatically. Unsynced changes use a new user/organization-scoped cache and can be recovered at login with Retry sync. Only changed records are written. Compare-and-set checks preserve newer cloud edits; conflicts retain local changes for export and review. Refresh pulls cloud data when there are no pending local changes. Linked records sync in parent-first order, and client-generated UUIDs make interrupted inserts safe to retry.
 
 ## Tests
 
@@ -31,13 +31,13 @@ python -m pip install -r tests/requirements.txt
 python tests/browser_test.py
 ```
 
-Tests use local fixtures and a simulated Supabase adapter without production writes. They cover UUID hydration, action buttons, completion, sync termination, empty-workspace creation, invoices/payments, account mapping, text escaping, failed-sync recovery, reset requests, sign-out and mobile SDK-load errors. Chromium must be installed at /usr/bin/chromium, or adjust the executable path in the test.
+Tests use local fixtures and a simulated Supabase adapter without production writes. They cover UUID hydration, action buttons, completion, sync termination, empty-workspace creation, invoices/payments, account mapping, text escaping, failed-sync recovery, reset requests, sign-out and mobile SDK-load errors. Install a system Chromium or run `python -m playwright install chromium`. Set CHROMIUM_PATH to use a particular system binary. A GitHub Actions workflow runs these checks on pushes and pull requests.
 
 ## Deployment and limits
 
 Host index.html, app.js and styles.css on a static host. A Vercel static configuration is included; no deployment was created in this session.
 
-Live database inspection was denied by the connected Supabase account. Production login, RLS, bootstrap, password-email delivery and real cloud writes remain unverified. No production business records were changed during development or testing.
+Live service connections and deployment are deferred until the GitHub app is ready. Production login, RLS, bootstrap, password-email delivery and real cloud writes remain unverified. No production business records were changed during development or testing.
 
 The financial screens are management summaries, not formal double-entry bookkeeping. Automatic recurring visit generation, automated WhatsApp, technician roles and a formal ledger remain future work.
 
@@ -45,3 +45,7 @@ The financial screens are management summaries, not formal double-entry bookkeep
 
 Recovered source: chaudharyOOO1/Aahana-Pest-Control, workspace commit 59758ce.
 Repository: https://github.com/chaudharyOOO1/Aahana-Pest-Control.
+
+## Sync behavior
+
+See docs/SYNC.md for record relationships, conflict recovery, and the distinction between source-code updates and business-data sync. Cloudflare and Vercel configuration will be addressed afterward; this repository workflow runs tests and does not deploy.

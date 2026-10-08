@@ -2,6 +2,8 @@
 import functools
 import http.server
 import json
+import os
+import shutil
 from pathlib import Path
 import threading
 import unittest
@@ -19,14 +21,17 @@ window.supabase={createClient:()=>({
  resetPasswordForEmail:async email=>{window.mockReset=email;return {error:null}},
  updateUser:async data=>{window.mockPassword=data.password;return {error:null}},
  signOut:async()=>{session=null;listener('SIGNED_OUT',null);return {error:null}}},
- from:table=>{let op='select',payload,filters=[];
- const q={select(){return q},eq(k,v){filters.push([k,v]);return q},insert(p){op='insert';payload=p;return q},update(p){op='update';payload=p;return q},single(){return q},
+ from:table=>{let op='select',payload,filters=[],one=false,start=0,end=Infinity,ignoreDuplicates=false;
+ const q={select(){return q},eq(k,v){filters.push([k,v]);return q},is(k,v){filters.push([k,v]);return q},order(){return q},range(a,b){start=a;end=b;return q},insert(p){op='insert';payload=p;return q},upsert(p,options){op='upsert';payload=p;ignoreDuplicates=options.ignoreDuplicates;return q},update(p){op='update';payload=p;return q},single(){one=true;return q},maybeSingle(){one=true;return q},
  then(resolve){let rows=window.mockRows[table]||[];let result;
- if(op==='select')result={data:rows.filter(r=>filters.every(([k,v])=>r[k]===v)),error:null};
+ if(op==='select'){const data=rows.filter(r=>filters.every(([k,v])=>r[k]===v)).slice(start,end+1);result={data:one?(data[0]||null):data,error:null}}
  else {window.mockWrites.push({table,op,payload,filters});if(window.mockError)result={data:null,error:{message:'offline'}};
- else{let row=op==='insert'?{id:crypto.randomUUID(),...payload}:rows.find(r=>filters.every(([k,v])=>r[k]===v));
- if(op==='insert'){(window.mockRows[table]??=[]).push(row)}else if(row)Object.assign(row,payload);
- result={data:row,error:row?null:{message:'missing row'}}}}return Promise.resolve(result).then(resolve)} };return q}
+ else{let row;
+ if(op==='upsert'){row=rows.find(r=>r.id===payload.id);if(row&&ignoreDuplicates){result={data:null,error:null};return Promise.resolve(result).then(resolve)}}
+ else if(op==='update')row=rows.find(r=>filters.every(([k,v])=>r[k]===v));
+ if(op==='insert'||op==='upsert'&&!row){row={id:crypto.randomUUID(),...payload};(window.mockRows[table]??=[]).push(row)}else if(row)Object.assign(row,payload);
+ result={data:row||null,error:null};if(window.mockLostResponse&&row){window.mockLostResponse=false;result={data:null,error:{message:'response interrupted'}}}}}return Promise.resolve(result).then(resolve)} };return q}
+
 })};
 '''
 
@@ -53,7 +58,8 @@ class BrowserTests(unittest.TestCase):
         cls.server=http.server.ThreadingHTTPServer(('127.0.0.1',0),handler)
         threading.Thread(target=cls.server.serve_forever,daemon=True).start()
         cls.pw=sync_playwright().start()
-        cls.browser=cls.pw.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+        executable=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium')
+        cls.browser=cls.pw.chromium.launch(executable_path=executable,headless=True,args=['--no-sandbox'])
     @classmethod
     def tearDownClass(cls):
         cls.browser.close();cls.pw.stop();cls.server.shutdown();cls.server.server_close()
@@ -127,6 +133,60 @@ class BrowserTests(unittest.TestCase):
         self.load()
         self.page.evaluate("Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{throw Error('Permission denied')}}});window.alert=message=>window.clipboardResult=message;sendWA(1)")
         self.page.wait_for_function("window.clipboardResult?.includes('Could not copy')")
+        self.assertEqual(self.errors,[])
+
+    def test_only_changed_modules_are_written(self):
+        self.load()
+        self.page.evaluate("window.prompt=()=> 'Completed';completeVisit(1)")
+        self.page.wait_for_function('!cloudDirty')
+        tables=self.page.evaluate('[...new Set(mockWrites.map(w=>w.table))].sort()')
+        self.assertEqual(tables,['service_plans','visit_reports','visits'])
+        self.assertEqual(self.errors,[])
+
+    def test_conflicting_cloud_change_is_not_overwritten(self):
+        self.load()
+        self.page.evaluate("mockRows.clients[0].name='Newer remote name';clients[0].name='Local name';saveData()")
+        self.page.wait_for_function("document.getElementById('syncStatus').textContent.includes('conflict')")
+        self.assertEqual(self.page.evaluate('mockRows.clients[0].name'),'Newer remote name')
+        self.assertTrue(self.page.evaluate('cloudDirty'))
+        self.page.evaluate('refreshCloudData(true)')
+        self.assertEqual(self.page.evaluate('clients[0].name'),'Local name')
+        self.assertEqual(self.errors,[])
+
+    def test_remote_refresh_updates_related_views(self):
+        self.load()
+        self.page.evaluate("mockRows.clients[0].name='Renamed client';mockRows.payments.push({id:'payment-uuid',organization_id:'business-org',invoice_id:'invoice-uuid',receipt:'REC-001',payment_date:'2026-10-08',amount:50,mode:'UPI'});refreshCloudData(true)")
+        self.page.wait_for_function("clients[0].name==='Renamed client' && payments.length===1 && !cloudHydrating")
+        self.assertIn('Renamed client',self.page.locator('#billingRows').inner_text())
+        self.assertIn('68.00',self.page.locator('#bOutstanding').inner_text())
+        self.assertEqual(self.page.evaluate("accountBalances()[accountIdByName('UPI')]"),50)
+        self.assertEqual(self.page.evaluate('mockWrites.length'),0)
+        self.assertEqual(self.errors,[])
+
+    def test_interrupted_insert_retry_does_not_duplicate(self):
+        self.load(empty=True)
+        self.page.evaluate("mockLostResponse=true;openModal('client')")
+        self.page.locator('#mName').fill('Retry client')
+        self.page.evaluate('saveModal()')
+        self.page.wait_for_function("document.getElementById('syncStatus').textContent.includes('interrupted')")
+        self.page.evaluate('cloudSyncNow()')
+        self.page.wait_for_function('!cloudDirty')
+        self.assertEqual(self.page.evaluate('mockRows.clients.length'),1)
+        self.assertEqual(self.errors,[])
+
+    def test_supplier_expense_capital_sync_and_reload(self):
+        self.load()
+        self.page.evaluate("""window.prompt=(text,initial)=>text.startsWith('Supplier ID')?'1':text.startsWith('Supplier bill number')?'B-001':text.startsWith('Total bill amount')?'236':text.startsWith('GST included')?'36':text.startsWith('Payment amount')?'100':text.startsWith('Payment mode')?'Bank':initial||'';addVendorBill();recordVendorPayment(1);
+        window.prompt=(text,initial)=>text.startsWith('Total expense amount')?'118':text.startsWith('GST included')?'18':text.startsWith('Payment account')?'Petty Cash':initial||'';addExpense();
+        window.prompt=(text,initial)=>text.startsWith('Owner capital')?'500':text.startsWith('Capital account')?'Bank':initial||'';addCapital();""")
+        self.page.wait_for_function('!cloudDirty')
+        self.page.evaluate('refreshCloudData(true)')
+        self.page.wait_for_function('!cloudHydrating')
+        self.assertEqual(self.page.evaluate('vendorBills[0].amount-vendorPayments[0].amount'),136)
+        self.assertEqual(self.page.evaluate("accountBalances()[accountIdByName('Bank')]"),400)
+        self.assertEqual(self.page.evaluate("accountBalances()[accountIdByName('Petty Cash')]"),-118)
+        self.assertIn('200.00',self.page.locator('#aProfit').inner_text())
+        self.assertEqual(self.page.evaluate('mockRows.vendor_bills[0].vendor_id'), 'vendor-uuid')
         self.assertEqual(self.errors,[])
 
     def test_mobile_login_and_missing_library(self):
