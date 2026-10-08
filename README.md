@@ -21,7 +21,7 @@ Serve this directory with `python -m http.server 8080` and open http://localhost
 
 ## Backend
 
-app.js uses the existing project URL and browser-safe publishable key. Never include passwords, service-role keys or secret keys. Supabase RLS and the existing bootstrap Edge Function must enforce authorization; browser email restrictions are only a UI constraint.
+app.js now targets the owner-supplied Aahana project `gvevmnzibhuqnpdfvidl` using its browser-safe publishable key. This is a configuration change; the new project schema, authentication and import still need setup through the correct connected Supabase account. Never include passwords, service-role keys or secret keys. Supabase RLS and the existing bootstrap Edge Function must enforce authorization; browser email restrictions are only a UI constraint.
 
 Apply the versioned billing ERP migration before deploying this frontend; setup and limits are in [docs/FINANCE.md](docs/FINANCE.md). The database must contain the 15 tables and membership policies described in PROJECT-WORK.md and the bootstrap-aahana-workspace Edge Function. Configure the deployed URL in Supabase Auth's allowed redirect URLs for password recovery. Create/confirm the fixed business-admin account through a trusted admin workflow. Public signup is disabled in this app.
 

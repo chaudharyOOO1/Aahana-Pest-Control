@@ -1,5 +1,5 @@
-const SUPABASE_URL='https://luowrypiqkaynzzvepey.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY='sb_publishable_ETZ5Em1LI-pFfniw0SdkSQ_TTTZaX0A';
+const SUPABASE_URL='https://gvevmnzibhuqnpdfvidl.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_M6bDouk3Ts8Jelfmlnji5A_vkGyJNDK';
 const supabaseClient=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let cloudUser=null,cloudOrgId=null;
 function authStatus(message,error=false){const el=document.getElementById('authStatus');if(el){el.textContent=message;el.style.color=error?'var(--danger)':'var(--muted)'}}
