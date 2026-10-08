@@ -466,7 +466,7 @@ Final production URL still needs to be recorded and verified:
 
 GitHub repository:
 
-`https://github.com/schaudhary8927-prog/aahana-pest-control`
+`https://github.com/chaudharyOOO1/Aahana-Pest-Control`
 
 Repository source-of-truth status was not yet confirmed as containing
 the complete production app.
