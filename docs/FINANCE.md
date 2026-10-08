@@ -1,29 +1,45 @@
-# Invoice, receipt, accounts and reports
+# Financial ERP
 
-This implementation follows the project handoff supplied in this conversation. Additional decisions from a separate Codex conversation have not been supplied and are not assumed.
+Implemented in the correct `chaudharyOOO1/Aahana-Pest-Control` repository. Deployment, live database migration, provider provisioning and historical imports are deferred by the owner.
 
-## Invoice and receipt workflow
+## Billing and invoices
 
-Create an invoice with a client, invoice number, date, taxable amount and GST rate. Amounts are calculated in integer paise, with GST rounded to the nearest paisa and added to taxable value. Duplicate invoice numbers are checked without regard to case. Automatically suggested INV and REC numbers continue after the highest existing numeric suffix, including gaps in historical records.
+The Financial ERP section saves company name/address/GSTIN/state/email/payment instructions and each client's registered billing email/address/GSTIN/state/monthly taxable rate/GST rate. Monthly generation copies these details into the invoice; changing a profile does not rewrite earlier invoices.
 
-Record a payment through the payment form. Choose its actual receiving account, amount, date and unique receipt number. The form permits partial and full payments and rejects nonpositive amounts, more than two decimal places, duplicate receipt numbers and amounts greater than the currently loaded balance. A payment date must be on or after its invoice date and no later than today. Advance payments without an invoice are not modeled.
+Invoice numbers follow `APC/2026-27/0001`, with an April–March financial year and a sequence per prefix/year. Prefixes allow 1–3 letters/digits/hyphens; each annual sequence supports 9,999 invoices. Service month is distinct from invoice date. The completed-work generator requires completed monthly contracted visits, skips clients without completed work and suppresses duplicate client/month drafts. Completing the final monthly visit drafts an invoice when automatic billing is enabled and the billing profile is complete. Nonmonthly plans use their recorded total completion. Visit completion remains saved if billing setup is incomplete.
 
-Each receipt-row button previews that specific receipt. The invoice-row receipt button previews the latest dated receipt for that invoice. Invoice and receipt previews can be printed or saved as PDF through the browser. The invoice preview is a management summary; business address, GSTIN, tax split, line-item details and the final statutory tax-invoice format must be supplied/configured before issuing tax invoices.
+Invoices display taxable value and CGST/SGST for matching saved state codes, or IGST for differing codes. Zero-rated invoices show no tax. Browser printing saves an invoice PDF. Email attachments use a server-generated one-page PDF and the saved billing snapshot. Very long billing descriptions need shortening before email; the attachment uses Latin text and INR amounts. Manual invoices without complete profiles remain management summaries and cannot be emailed as complete invoices. They can be retained for reviewing historical data.
 
-## Consistent totals
+Payment forms support actual dated partial/full receipts and exact receipt printing. Receiving a payment changes cash and receivables, not revenue. Future-dated, nonpositive, duplicate and overpaid receipts are rejected. Advance receipts without invoices are not modeled.
 
-Billing, account balances, GST, P&L, balance-sheet and report totals share finance-core.js. Summation uses integer paise to avoid cumulative floating-point differences.
+## Monthly reports and remaining funds
 
-Revenue is taxable billing excluding GST. Collections are actual payments. Expenses and supplier bills contribute their amount excluding separately recorded GST. Receiving a payment changes cash and receivables, not revenue. Accounts start from opening balances and include subsequent capital, receipts, expenses and supplier payments.
+The Financial ERP P&L recognizes taxable revenue in the saved service month, falling back to invoice month for legacy invoices. Costs are expenses and supplier bills excluding their separately recorded GST. Cash flow follows actual dates of customer receipts, expense/supplier payments, GST payments and owner capital. Account transfers move balances between accounts without changing profit or total funds. Opening/closing funds and a cash reconciliation difference are shown. Print monthly report includes P&L, cash flow, month-end management balance sheet, funds by account and expense detail.
 
-The management balance-sheet model treats opening liquid funds as opening equity. Opening balances must represent the position before the transactions loaded into this dataset. They must not already include those same receipts or expenses. Historical imports will need a reviewed cutover date and treatment for any opening receivables, payables, GST and equity before data is posted. The current model does not replace a double-entry ledger.
+The existing Reports section remains a transaction-date view; the Financial ERP section explicitly provides service-month P&L. Balance sheets use invoice/transaction posting dates and therefore can differ from service-month P&L when billing happens later. Opening liquid funds are opening equity. Imported opening balances must precede the recorded transactions. Opening receivables/payables/GST, fixed assets, depreciation, loans, salary accruals and a formal double-entry ledger need a reviewed accounting cutover before statutory reporting. These are management statements based on the records entered, not a completed statutory ledger.
 
-Monthly performance filters billing, collections, expenses and GST by each transaction's date. Current cash and outstanding figures continue to show the current overall position. The client table shows invoices in the selected period and all receipts applied to those invoices, so payments in another month do not falsely increase the current amount outstanding.
+## GST
 
-## Before real data or deployment
+Filing records store period, submitted/draft status, filing date/reference and recorded input/output GST. Changing submission status does not collect a customer payment or move cash. Actual GST payments separately reduce the selected account and recorded tax liability. Input GST is recorded rather than automatically assumed eligible or submitted. No government filing is performed by the app.
 
-Historical clients, invoices, receipts and expenses have not yet been imported. Prepare an import preview that validates identifiers, relationships, dates, duplicate numbers, GST and opening balances, and reconcile it against the supplied records before posting.
+## Bank statements
 
-The connected production backend has not been modified. Frontend validation operates against loaded data. Before live use with simultaneous writers, enforce receipt-number uniqueness and payment limits transactionally on the server, and verify the real schema and RLS. Existing row compare-and-set sync does not serialize independent new receipt inserts against the same invoice.
+Import a CSV with `date,description,debit,credit,reference` (reference optional). Dates support YYYY-MM-DD and DD/MM/YYYY; quoted commas and INR amounts are supported. An invalid row rejects the import for correction. Select the actual account first. Exact repeated imports are suppressed using a hash of account/date/reference/description/amount/direction and occurrence number. Changed source descriptions or changed subsets with indistinguishable repeated transactions require review.
 
-Tests cover monetary rounding, partial and full collections, dated receipts, exact receipt selection, cancellation/invalid amounts, cross-month outstanding figures, and reconciliation of opening funds across all summaries.
+All rows stage for review. Each approved row needs a payment reason and classification: expense with included GST, invoice receipt, owner capital, GST payment, account transfer, or match an existing entry. Matching supports customer receipts, expenses, supplier payments, capital, GST and transfers with identical date/amount/account. It does not post another transaction. When importing both sides of a transfer, post one side and match the other. Unrecognized or ambiguous bank annotations are never automatically posted. PDF/image statements require conversion to this CSV format; no OCR import is included.
+
+## Invoice email
+
+`POST /api/send-invoices` verifies the authenticated administrator and organization membership, reads saved invoice recipients/details through RLS, and processes up to ten invoices per request. UI controls send one, selected, or all unsent invoices with personalized subject/message and PDF attachment. Bulk requests are batched. The message is generated from the saved invoice using a deterministic template; no LLM or customer data sharing with an AI provider is configured.
+
+Configure server-only `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `RESEND_API_KEY`, and `INVOICE_FROM_EMAIL` after selecting the intended deployment and verifying the sender domain. No service-role key is used. Sending is disabled by a clear configuration response until then. Never expose the provider key in app.js or browser storage. Provider API requests are covered by mocked tests; live deliverability is unverified.
+
+Delivery records track pending and provider-accepted sends. Accepted sends are suppressed on retry. The provider idempotency key is based on the invoice identity and saved snapshot. A pending attempt with changed details or older than 23 hours requires delivery review, preventing blind retries beyond the provider's retry window. Accepted is not proof of inbox delivery; bounce/webhook reporting is future integration work. Sending requests never alter payment status.
+
+## Backend setup before deployment
+
+The existing schema described in PROJECT-WORK.md must be present. Review duplicate invoice/receipt numbers and back up data before applying `supabase/migrations/20261008182153_billing_erp.sql` through the normal migration workflow. The migration adds billing JSON, organization-scoped ERP records/RLS, invoice/receipt uniqueness and a transactional payment guard that locks the invoice before testing its remaining balance. Monthly auto-invoice identities are unique per organization/client/service month. The frontend requires these additions; it must not be deployed before the migration.
+
+Concurrent invoice-number reservation conflicts retain the local draft for backup/review; numbering is not a centralized allocator. Do not import arbitrary historical billing details as executable HTML. All previews escape saved text. Historical client/bill/bank imports still require review, relationship matching and opening-balance reconciliation before posting.
+
+Tests run against mock browser data and a disposable local PostgreSQL instance. No production schema, business records or real emails were changed in development.

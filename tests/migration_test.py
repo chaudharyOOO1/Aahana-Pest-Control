@@ -1,0 +1,59 @@
+"""Apply the migration to a disposable Postgres container; no remote database access."""
+import os,subprocess,time,uuid
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+name='aahana-sql-test-'+uuid.uuid4().hex[:10]
+env={k:v for k,v in os.environ.items() if k not in ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH']}
+docker=['docker','--host=unix:///var/run/docker.sock']
+def run(args,sql=None,check=True):
+    result=subprocess.run(docker+args,input=sql,text=True,capture_output=True,env=env)
+    if check and result.returncode: raise RuntimeError(result.stderr or result.stdout)
+    return result
+def psql(sql):
+    return run(['exec','-i',name,'psql','-U','postgres','-v','ON_ERROR_STOP=1'],sql).stdout
+bootstrap="""
+create role authenticated;
+create role anon;
+create table organizations(id uuid primary key);
+create table organization_members(organization_id uuid,user_id uuid);
+create function is_org_member(target_org uuid) returns boolean language sql stable security invoker set search_path=public as $$
+ select exists(select 1 from organization_members where organization_id=target_org and user_id=current_setting('test.user_id')::uuid)
+$$;
+create table clients(id uuid primary key,organization_id uuid);
+create table invoices(id uuid primary key,organization_id uuid,invoice_date date not null,total numeric not null,invoice_no text,client_id uuid);
+create table payments(id uuid primary key,organization_id uuid,invoice_id uuid,payment_date date not null,amount numeric not null,receipt text);
+grant usage on schema public to authenticated;
+grant select on organization_members to authenticated;
+grant select,insert,update on invoices,payments to authenticated;
+alter table invoices enable row level security;
+alter table payments enable row level security;
+create policy invoices_members on invoices to authenticated using(is_org_member(organization_id)) with check(is_org_member(organization_id));
+create policy payments_members on payments to authenticated using(is_org_member(organization_id)) with check(is_org_member(organization_id));
+insert into organizations values('00000000-0000-4000-8000-000000000001'),('00000000-0000-4000-8000-000000000002');
+insert into organization_members values('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000003');
+insert into invoices(id,organization_id,invoice_date,total) values('00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000001',current_date-10,118);
+"""
+checks="""
+set role authenticated;
+set test.user_id='00000000-0000-4000-8000-000000000003';
+insert into erp_records(organization_id,kind,record_key,payload) values('00000000-0000-4000-8000-000000000001','company_profile','company','{"name":"Aahana"}');
+insert into payments values('00000000-0000-4000-8000-000000000005','00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004',current_date,50,'REC-001');
+do $$begin
+ begin insert into payments values(gen_random_uuid(),'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004',current_date,100,'REC-002');raise exception 'overpayment accepted';exception when raise_exception then if SQLERRM<>'Payment exceeds invoice outstanding' then raise;end if;end;
+ begin insert into payments values(gen_random_uuid(),'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004',current_date,1,' rec-001 ');raise exception 'duplicate accepted';exception when unique_violation then null;end;
+ begin insert into erp_records(organization_id,kind,record_key,payload) values('00000000-0000-4000-8000-000000000002','company_profile','company','{}');raise exception 'cross-org insert accepted';exception when insufficient_privilege then null;end;
+ begin insert into payments values(gen_random_uuid(),'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004',current_date+1,1,'REC-003');raise exception 'future payment accepted';exception when raise_exception then if SQLERRM<>'Payment date must fall between invoice date and today' then raise;end if;end;
+end $$;
+select 'Migration checks passed: payment limits, receipt uniqueness, payment dates and organization isolation.';
+"""
+try:
+    run(['run','-d','--name',name,'--network','none','-e','POSTGRES_HOST_AUTH_METHOD=trust','postgres:17-alpine'])
+    for attempt in range(40):
+        if run(['exec',name,'sh','-c','test "$(head -n 1 /var/lib/postgresql/data/postmaster.pid 2>/dev/null)" = 1 && pg_isready -U postgres'],check=False).returncode==0:break
+        time.sleep(.25)
+    else:raise RuntimeError('Disposable Postgres did not start')
+    psql(bootstrap)
+    for file in sorted((ROOT/'supabase/migrations').glob('*.sql')):psql(file.read_text())
+    print(psql(checks))
+finally:
+    run(['rm','-f',name],check=False)

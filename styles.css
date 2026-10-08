@@ -15,3 +15,5 @@ main{padding:28px;max-width:1450px;width:100%;margin:auto}.page-head{display:fle
 
 .financial-document{line-height:1.6}.financial-document .table{min-width:0}.modal{max-height:90vh;overflow:auto}
 @media print{body>*{display:none!important}body>#modal{display:block!important;position:static;background:white;padding:0}#modal .modal{width:100%;max-height:none;border:0;box-shadow:none;color:black;background:white}#modal .modal-head button,#modal .modal-foot{display:none!important}#modal .modal-body{display:block;padding:0}.financial-document .table{min-width:0} .financial-document th,.financial-document td{color:black}}
+
+.erp-fields{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}#financialERP input,#financialERP select{max-width:100%}#financialERP pre{white-space:pre-wrap}

@@ -24,11 +24,11 @@ window.supabase={createClient:()=>({
  from:table=>{let op='select',payload,filters=[],one=false,start=0,end=Infinity,ignoreDuplicates=false;
  const q={select(){return q},eq(k,v){filters.push([k,v]);return q},is(k,v){filters.push([k,v]);return q},order(){return q},range(a,b){start=a;end=b;return q},insert(p){op='insert';payload=p;return q},upsert(p,options){op='upsert';payload=p;ignoreDuplicates=options.ignoreDuplicates;return q},update(p){op='update';payload=p;return q},single(){one=true;return q},maybeSingle(){one=true;return q},
  then(resolve){let rows=window.mockRows[table]||[];let result;
- if(op==='select'){const data=rows.filter(r=>filters.every(([k,v])=>r[k]===v)).slice(start,end+1);result={data:one?(data[0]||null):data,error:null}}
+ if(op==='select'){const data=rows.filter(r=>filters.every(([k,v])=>(typeof r[k]==='object'?JSON.stringify(r[k])===v:r[k]===v))).slice(start,end+1);result={data:one?(data[0]||null):data,error:null}}
  else {window.mockWrites.push({table,op,payload,filters});if(window.mockError)result={data:null,error:{message:'offline'}};
  else{let row;
  if(op==='upsert'){row=rows.find(r=>r.id===payload.id);if(row&&ignoreDuplicates){result={data:null,error:null};return Promise.resolve(result).then(resolve)}}
- else if(op==='update')row=rows.find(r=>filters.every(([k,v])=>r[k]===v));
+ else if(op==='update')row=rows.find(r=>filters.every(([k,v])=>(typeof r[k]==='object'?JSON.stringify(r[k])===v:r[k]===v)));
  if(op==='insert'||op==='upsert'&&!row){row={id:crypto.randomUUID(),...payload};(window.mockRows[table]??=[]).push(row)}else if(row)Object.assign(row,payload);
  result={data:row||null,error:null};if(window.mockLostResponse&&row){window.mockLostResponse=false;result={data:null,error:{message:'response interrupted'}}}}}return Promise.resolve(result).then(resolve)} };return q}
 
@@ -37,7 +37,7 @@ window.supabase={createClient:()=>({
 
 def fixture(empty=False):
     org='business-org'
-    tables=['clients','service_plans','visits','visit_reports','jobs','invoices','payments','expenses','accounts','owner_capital','vendors','vendor_bills','vendor_payments']
+    tables=['clients','service_plans','visits','visit_reports','jobs','invoices','payments','expenses','accounts','owner_capital','vendors','vendor_bills','vendor_payments','erp_records']
     rows={t:[] for t in tables}
     rows['organization_members']=[dict(user_id='admin-user',organization_id=org,role='owner')]
     rows['accounts']=[dict(id='account-'+name,name=name,type=name,opening='0',organization_id=org) for name in ['UPI / Wallet','Petty Cash','Bank','Cash']]
@@ -49,6 +49,8 @@ def fixture(empty=False):
         rows['vendors']=[dict(id='vendor-uuid',name='Supplier',contact='123',gstin='')]
     for records in rows.values():
         for record in records:record.setdefault('organization_id',org)
+    for table in ['clients','invoices']:
+        for row in rows[table]: row['billing_details']={}
     return rows
 
 class BrowserTests(unittest.TestCase):
@@ -249,6 +251,71 @@ class BrowserTests(unittest.TestCase):
         self.assertIn('50.00',rows)
         self.assertIn('68.00',rows)
         self.assertIn('0.00',self.page.locator('#rCollected').inner_text())
+        self.assertEqual(self.errors,[])
+
+    def billing_setup(self):
+        self.page.evaluate("""() => {
+          const fields={eCompanyAddress:'Mumbai office',eCompanyGST:'27ABCDE1234F1Z5',eCompanyState:'27',eCompanyEmail:'office@example.test',eBankDetails:'Bank account 123'};
+          Object.entries(fields).forEach(([id,value])=>document.getElementById(id).value=value);ERP.saveCompany();
+          const client={eClientAddress:'Client site Mumbai',eClientEmail:'billing@example.test',eClientState:'27',eClientRate:'1000',eClientTaxRate:'18'};
+          Object.entries(client).forEach(([id,value])=>document.getElementById(id).value=value);ERP.saveClient(1);
+        }""")
+        self.page.wait_for_function('!cloudDirty')
+
+    def test_billing_snapshots_service_month_and_reload(self):
+        self.load();self.billing_setup()
+        self.page.evaluate("""() => {visits[0].status='done';visits[0].date='2026-09-30';plans[0].completed=4;for(let id=2;id<=4;id++)visits.push({...visits[0],id,cloud_id:undefined});document.getElementById('eServiceMonth').value='2026-09';document.getElementById('eInvoiceDate').value='2026-10-08';ERP.generateMonthly()}""")
+        self.page.wait_for_function('!cloudDirty')
+        invoice=self.page.evaluate('invoices[1]')
+        self.assertEqual(invoice['no'],'APC/2026-27/0001')
+        self.assertEqual(invoice['billing']['serviceMonth'],'2026-09')
+        self.assertEqual(invoice['billing']['gst']['cgst'],90)
+        self.assertEqual(invoice['date'],'2026-10-08')
+        self.page.evaluate("document.getElementById('eClientRate').value='2000';ERP.saveClient(1);ERP.preview(2)")
+        self.assertIn('1,180',self.page.locator('#modalBody').inner_text())
+        self.page.evaluate('closeModal()');self.page.wait_for_function('!cloudDirty');self.page.add_init_script('window.mockRows='+json.dumps(self.page.evaluate('mockRows'))+';');self.page.reload();self.page.wait_for_function('cloudReady')
+        self.assertEqual(self.page.evaluate('invoices[1].billing.client.monthlyRate'),1000)
+        self.assertEqual(self.page.evaluate('clients[0].billing.monthlyRate'),2000)
+        self.assertEqual(self.errors,[])
+
+    def test_completion_drafts_once_and_plan_not_complete_skips(self):
+        self.load();self.billing_setup()
+        self.page.evaluate("invoices=[];window.prompt=()=> 'Completed';completeVisit(1)")
+        self.assertEqual(self.page.evaluate('invoices.length'),0)
+        self.page.evaluate("plans[0].completed=3;for(let id=2;id<=4;id++)visits.push({...visits[0],id,cloud_id:undefined,status:'done'});visits[0].status='due';completeVisit(1)")
+        self.assertEqual(self.page.evaluate('invoices.length'),1)
+        self.page.evaluate('ERP.afterVisit(1)')
+        self.assertEqual(self.page.evaluate('invoices.length'),1)
+        self.page.wait_for_function('!cloudDirty');self.assertEqual(self.errors,[])
+
+    def test_gst_filing_does_not_collect_cash(self):
+        self.load()
+        self.page.evaluate("document.getElementById('eGSTStatus').value='filed';document.getElementById('eGSTReference').value='ARN-123';ERP.saveFiling()")
+        self.assertEqual(self.page.evaluate('payments.length'),0)
+        self.assertEqual(self.page.evaluate('AahanaFinance.summary(ERP.data()).cash'),0)
+        self.page.evaluate("document.getElementById('eGSTPaid').value='10';document.getElementById('eGSTAccount').value='Bank';ERP.saveTaxPayment()")
+        self.assertEqual(self.page.evaluate('AahanaFinance.summary(ERP.data()).cash'),-10)
+        self.assertEqual(self.page.evaluate('AahanaFinance.summary(ERP.data()).balanceCheck'),0)
+        self.page.wait_for_function('!cloudDirty');self.assertEqual(self.errors,[])
+
+    def test_bank_stage_deduplicate_post_match_and_reload(self):
+        self.load()
+        self.page.evaluate("document.getElementById('eBankAccount').value='Bank'")
+        import_js=r"""async() => {await ERP.importBank({target:{files:[new File(['date,description,debit,credit,reference\n2026-10-08,Client payment,,50,UTR-001'], 'bank.csv')]}})}"""
+        self.page.evaluate(import_js)
+        self.assertEqual(self.page.evaluate('payments.length'),0)
+        self.page.evaluate("document.getElementById('eBankAccount').value='Bank'");self.page.evaluate(import_js)
+        self.assertEqual(self.page.evaluate("erpRecords.filter(r=>r.kind==='bank_transaction').length"),1)
+        bank_id=self.page.evaluate("erpRecords.find(r=>r.kind==='bank_transaction').id")
+        self.page.evaluate(f"document.getElementById('eBankKind{bank_id}').value='receipt';ERP.bankOptions({bank_id});document.getElementById('eBankTarget{bank_id}').value='1';document.getElementById('eBankReason{bank_id}').value='Hotel payment';ERP.postBank({bank_id})")
+        self.page.wait_for_function('!cloudDirty')
+        self.assertEqual(self.page.evaluate('payments.length'),1)
+        self.assertEqual(self.page.evaluate("erpRecords.find(r=>r.kind==='bank_transaction').data.linkedCloudId"),self.page.evaluate('payments[0].cloud_id'))
+        self.page.evaluate(f'ERP.postBank({bank_id})');self.assertEqual(self.page.evaluate('payments.length'),1)
+        self.page.evaluate("erpRecords.push({id:50,kind:'bank_transaction',key:'another',data:{date:'2026-10-08',account:'Bank',direction:'in',amount:50,status:'review'}});ERP.render();document.getElementById('eBankKind50').value='match';ERP.bankOptions(50);document.getElementById('eBankTarget50').value='receipt:1';document.getElementById('eBankReason50').value='Match existing';ERP.postBank(50)")
+        self.assertEqual(self.page.evaluate('payments.length'),1)
+        self.page.wait_for_function('!cloudDirty');self.page.add_init_script('window.mockRows='+json.dumps(self.page.evaluate('mockRows'))+';');self.page.reload();self.page.wait_for_function('cloudReady')
+        self.assertEqual(self.page.evaluate('payments[0].amount'),50)
         self.assertEqual(self.errors,[])
 
     def test_mobile_login_and_missing_library(self):

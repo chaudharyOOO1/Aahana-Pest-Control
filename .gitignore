@@ -5,3 +5,6 @@ __pycache__/
 node_modules/
 .vercel/
 test-results/
+!.env.example
+
+supabase/.temp/

@@ -15,7 +15,12 @@ jobs:
           node-version: '22'
       - run: node --check app.js
       - run: node --check finance-core.js
+      - run: node --check erp.js
+      - run: node --check api/send-invoices.js
       - run: node tests/finance_test.cjs
+      - run: node tests/erp_test.cjs
+      - run: node tests/email_test.cjs
       - run: python -m pip install -r tests/requirements.txt
       - run: python -m playwright install --with-deps chromium
       - run: python tests/browser_test.py
+      - run: python tests/migration_test.py

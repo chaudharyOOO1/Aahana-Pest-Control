@@ -37,7 +37,7 @@
   function accountBalances(data){
     const balances=Object.fromEntries(data.accounts.map(a=>[a.id,paise(a.opening)]));
     const post=(rows,field,sign)=>rows.forEach(row=>{const id=resolveAccount(data.accounts,row[field]);if(id!==undefined)balances[id]+=sign*paise(row.amount)});
-    post(data.ownerCapital,'mode',1);post(data.payments,'mode',1);post(data.expenses,'account',-1);post(data.vendorPayments,'mode',-1);
+    post(data.ownerCapital,'mode',1);post(data.payments,'mode',1);post(data.expenses,'account',-1);post(data.vendorPayments,'mode',-1);post(data.taxPayments||[],'mode',-1);post((data.accountTransfers||[]).map(r=>({...r,mode:r.from_mode})),'mode',-1);post((data.accountTransfers||[]).map(r=>({...r,mode:r.to_mode})),'mode',1);
     return Object.fromEntries(Object.entries(balances).map(([id,value])=>[id,rupees(value)]));
   }
   function summary(data){
@@ -45,10 +45,10 @@
     const gstCollected=sum(data.invoices,'gst'),expenseGross=sum(data.expenses,'amount'),expenseGST=sum(data.expenses,'gst');
     const vendorBilled=sum(data.vendorBills,'amount'),vendorPaid=sum(data.vendorPayments,'amount'),vendorGST=sum(data.vendorBills,'gst');
     const revenue=sum(data.invoices,'taxable'),operatingExpenses=sum([...data.expenses,...data.vendorBills],e=>rupees(paise(e.amount)-paise(e.gst)));
-    const profit=rupees(paise(revenue)-paise(operatingExpenses)),inputGST=rupees(paise(expenseGST)+paise(vendorGST)),netGST=rupees(paise(gstCollected)-paise(inputGST));
+    const profit=rupees(paise(revenue)-paise(operatingExpenses)),inputGST=rupees(paise(expenseGST)+paise(vendorGST)),netGST=rupees(paise(gstCollected)-paise(inputGST)-paise(sum(data.taxPayments||[],'amount')));
     const receivable=outstanding,payable=sum(data.vendors,v=>Math.max(0,sum(data.vendorBills.filter(b=>b.vendor===v.id),'amount')-sum(data.vendorPayments.filter(p=>p.vendor===v.id),'amount')));
     const capital=sum(data.ownerCapital,'amount'),openingFunds=sum(data.accounts,'opening'),balances=accountBalances(data),cash=sum(Object.values(balances).map(amount=>({amount})),'amount');
-    const assets=rupees(paise(cash)+paise(receivable)+paise(inputGST)),equity=rupees(paise(openingFunds)+paise(capital)+paise(profit)),liabilities=rupees(paise(payable)+paise(gstCollected));
+    const assets=rupees(paise(cash)+paise(receivable)+paise(inputGST)),equity=rupees(paise(openingFunds)+paise(capital)+paise(profit)),liabilities=rupees(paise(payable)+paise(gstCollected)-paise(sum(data.taxPayments||[],'amount')));
     const balanceCheck=rupees(paise(assets)-paise(liabilities)-paise(equity));
     return {billed,collected,outstanding,gstCollected,expenseGross,expenseGST,vendorBilled,vendorPaid,vendorGST,revenue,operatingExpenses,profit,inputGST,netGST,receivable,payable,capital,cash,assets,equity,liabilities,balanceCheck};
   }
