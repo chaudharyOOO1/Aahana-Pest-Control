@@ -1,0 +1,7 @@
+const assert=require('node:assert/strict');const {report}=require('../finance-ledger.js');
+const data={clients:[{id:1,name:'Client A'},{id:2,name:'Client B'}],invoices:[{id:1,client:1,date:'2026-04-01',taxable:1000,gst:180,total:1180},{id:2,client:2,date:'2026-05-01',taxable:500}],payments:[{date:'2026-05-01',invoice:1,amount:1180}],expenses:[{date:'2026-04-02',client:1,amount:118,gst:18},{date:'2026-04-03',amount:50,gst:0}],ownerCapital:[{date:'2026-04-01',amount:10000}],vendorBills:[{date:'2026-04-04',amount:236,gst:36}],vendorPayments:[{date:'2026-05-04',amount:236}]};
+const april=report(data,'2026-04');assert.equal(april.revenue,1000);assert.equal(april.profit,650);assert.equal(april.cash.customerCollections,0);assert.equal(april.cash.net,9832);assert.equal(april.clients[0].contribution,900);assert.equal(april.clients[1].revenue,0);assert.equal(april.expenses[1].scope,'Company');
+const may=report(data,'2026-05');assert.equal(may.revenue,500);assert.equal(may.cash.customerCollections,1180);assert.equal(may.cash.net,944);assert.equal(report(data).profit,1150);
+console.log('PASS: period P&L, client costs, GST exclusion, capital exclusion and cash-flow timing.');
+
+const shared=require('../finance-ledger.js').allocations({amount:100.01,gst:0,allocations:[{client:1,percent:50},{client:2,percent:50}]});assert.equal(shared.reduce((sum,a)=>sum+Math.round(a.amount*100),0),10001);assert.equal(shared[0].amount,50.01);console.log('PASS: shared allocation rounds without losing paise.');
