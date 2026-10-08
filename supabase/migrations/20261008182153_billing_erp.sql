@@ -45,6 +45,6 @@ create trigger aahana_payment_checks before insert or update on public.payments
 for each row execute function public.validate_aahana_payment();
 
 -- Reserve invoice identities across simultaneous sessions.
-create unique index invoices_org_number_unique on public.invoices (organization_id,lower(btrim(invoice_no)));
+-- Invoice identity uniqueness is installed by the subsequent FY sequence migration.
 create unique index invoices_monthly_client_unique on public.invoices (organization_id,client_id,(billing_details->>'serviceMonth'))
 where billing_details->>'source' = 'monthly';

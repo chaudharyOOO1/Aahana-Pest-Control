@@ -120,7 +120,13 @@
       b = c?.billing || {};
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
       throw Error("Choose a valid service month.");
-    if (!p.address || !b.address) return {serviceMonth:month,fy:E.financialYear(date)};
+    if (!p.address || !b.address)
+      return {
+        serviceMonth: month,
+        fy: E.financialYear(date),
+        numbering: "automatic",
+        invoicePrefix: p.prefix || "APC",
+      };
     if (
       gst &&
       (!p.gstin ||
@@ -131,6 +137,7 @@
     return {
       company: JSON.parse(JSON.stringify(p)),
       client: { name: c.name, ...b },
+      numbering: "automatic",
       serviceMonth: month,
       fy: E.financialYear(date),
       gst: E.gstSplit(
@@ -174,7 +181,8 @@
     const invoice = {
       id: nextId(invoices),
       client: clientId,
-      no: E.invoiceNumber(invoices, p.prefix, date),
+      no: "Draft pending sync",
+      numberPending: true,
       date,
       ...amounts,
       paid: 0,
@@ -182,6 +190,7 @@
         company: JSON.parse(JSON.stringify(p)),
         client: { name: c.name, ...b },
         source: "monthly",
+        numbering: "automatic",
         serviceMonth: month,
         fy: E.financialYear(date),
         gst: E.gstSplit(amounts.gst, kind),
@@ -251,6 +260,12 @@
   function preview(id) {
     const i = invoices.find((i) => i.id === id);
     if (!i) return;
+    if (i.numberPending) {
+      alert(
+        "Sync this draft to receive its final invoice number before printing.",
+      );
+      return;
+    }
     const b = i.billing;
     if (!b?.company) {
       legacyPreview(id);
@@ -333,7 +348,11 @@
       }
     }
     const selected = invoices.filter((i) => ids.includes(i.id));
-    if (selected.some((i) => !i.cloud_id || !i.billing?.client?.email)) {
+    if (
+      selected.some(
+        (i) => i.numberPending || !i.cloud_id || !i.billing?.client?.email,
+      )
+    ) {
       alert(
         "Save and sync each invoice with a registered billing email first.",
       );
@@ -688,7 +707,14 @@
       b = erpRecords.find((r) => r.id === id)?.data;
     let list = [];
     if (kind === "receipt")
-      list = invoices.map((i) => [i.id, i.no + " · " + clientName(i.client)]);
+      list = invoices.map((i) => [
+        i.id,
+        i.no +
+          " · FY " +
+          E.financialYear(i.date) +
+          " · " +
+          clientName(i.client),
+      ]);
     if (kind === "match")
       list = bankCandidates(b).map((c) => [
         c.key,

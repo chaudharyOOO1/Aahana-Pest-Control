@@ -1,5 +1,6 @@
 """Apply the migration to a disposable Postgres container; no remote database access."""
 import os,subprocess,time,uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 name='aahana-sql-test-'+uuid.uuid4().hex[:10]
@@ -55,5 +56,16 @@ try:
     psql(bootstrap)
     for file in sorted((ROOT/'supabase/migrations').glob('*.sql')):psql(file.read_text())
     print(psql(checks))
+    print(psql((ROOT/'tests/invoice_sequence_checks.sql').read_text()))
+    concurrent_sql="""set role authenticated;
+set test.user_id='00000000-0000-4000-8000-000000000003';
+insert into public.invoices(id,organization_id,invoice_date,total,invoice_no,billing_details)
+values(gen_random_uuid(),'00000000-0000-4000-8000-000000000001','2026-10-01',100,'DRAFT-concurrent','{"numbering":"automatic"}') returning invoice_no;"""
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results=list(pool.map(lambda _:psql(concurrent_sql),range(8)))
+    numbers=[line.strip() for output in results for line in output.splitlines() if line.strip().startswith('APC/')]
+    assert len(numbers)==8 and len(set(numbers))==8, numbers
+    assert sorted(int(n.rsplit('/',1)[1]) for n in numbers)==list(range(90,98)),numbers
+    print('Concurrent allocation checks passed: 8 simultaneous saves got distinct consecutive numbers.')
 finally:
     run(['rm','-f',name],check=False)

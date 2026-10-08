@@ -29,7 +29,7 @@ window.supabase={createClient:()=>({
  else{let row;
  if(op==='upsert'){row=rows.find(r=>r.id===payload.id);if(row&&ignoreDuplicates){result={data:null,error:null};return Promise.resolve(result).then(resolve)}}
  else if(op==='update')row=rows.find(r=>filters.every(([k,v])=>(typeof r[k]==='object'?JSON.stringify(r[k])===v:r[k]===v)));
- if(op==='insert'||op==='upsert'&&!row){row={id:crypto.randomUUID(),...payload};(window.mockRows[table]??=[]).push(row)}else if(row)Object.assign(row,payload);
+ if(op==='insert'||op==='upsert'&&!row){row={id:crypto.randomUUID(),...payload};if(table==='invoices'&&payload.billing_details?.numbering==='automatic'){const fy=AahanaERP.financialYear(payload.invoice_date);const max=Math.max(0,...rows.filter(r=>AahanaERP.financialYear(r.invoice_date)===fy).map(r=>Number(String(r.invoice_no).match(/([0-9]+)$/)?.[1]||0)));row.invoice_no=(payload.billing_details.company?.prefix||'APC')+'/'+fy+'/'+String(max+1).padStart(4,'0')} (window.mockRows[table]??=[]).push(row)}else if(row)Object.assign(row,payload);
  result={data:row||null,error:null};if(window.mockLostResponse&&row){window.mockLostResponse=false;result={data:null,error:{message:'response interrupted'}}}}}return Promise.resolve(result).then(resolve)} };return q}
 
 })};
@@ -255,6 +255,22 @@ class BrowserTests(unittest.TestCase):
         self.assertIn('0.00',self.page.locator('#rCollected').inner_text())
         self.assertEqual(self.errors,[])
 
+    def test_invoice_number_lost_response_retry_and_shared_manual_auto_sequence(self):
+        self.load();self.billing_setup()
+        self.page.evaluate("window.mockLostResponse=true;openModal('invoice')")
+        self.page.locator('#mTaxable').fill('100')
+        self.page.evaluate('saveModal()')
+        self.page.wait_for_function("document.getElementById('syncStatus').textContent.includes('failed')")
+        self.assertTrue(self.page.evaluate('invoices[1].numberPending'))
+        self.page.evaluate('cloudSyncNow()');self.page.wait_for_function('!cloudDirty')
+        self.assertEqual(self.page.evaluate('invoices[1].no'),'APC/2026-27/0002')
+        self.assertFalse(self.page.evaluate('invoices[1].numberPending'))
+        self.assertEqual(self.page.evaluate('mockRows.invoices.length'),2)
+        self.page.evaluate("ERP.createInvoice(1,'2026-09','2026-10-08');saveData()")
+        self.page.wait_for_function('!cloudDirty')
+        self.assertEqual(self.page.evaluate('invoices[2].no'),'APC/2026-27/0003')
+        self.assertEqual(self.errors,[])
+
     def billing_setup(self):
         self.page.evaluate("""() => {
           const fields={eCompanyAddress:'Mumbai office',eCompanyGST:'27ABCDE1234F1Z5',eCompanyState:'27',eCompanyEmail:'office@example.test',eBankDetails:'Bank account 123'};
@@ -269,7 +285,7 @@ class BrowserTests(unittest.TestCase):
         self.page.evaluate("""() => {visits[0].status='done';visits[0].date='2026-09-30';plans[0].completed=4;for(let id=2;id<=4;id++)visits.push({...visits[0],id,cloud_id:undefined});document.getElementById('eServiceMonth').value='2026-09';document.getElementById('eInvoiceDate').value='2026-10-08';ERP.generateMonthly()}""")
         self.page.wait_for_function('!cloudDirty')
         invoice=self.page.evaluate('invoices[1]')
-        self.assertEqual(invoice['no'],'APC/2026-27/0001')
+        self.assertEqual(invoice['no'],'APC/2026-27/0002')
         self.assertEqual(invoice['billing']['serviceMonth'],'2026-09')
         self.assertEqual(invoice['billing']['gst']['cgst'],90)
         self.assertEqual(invoice['date'],'2026-10-08')
