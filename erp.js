@@ -120,7 +120,7 @@
       b = c?.billing || {};
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
       throw Error("Choose a valid service month.");
-    if (!p.address || !b.address) return {};
+    if (!p.address || !b.address) return {serviceMonth:month,fy:E.financialYear(date)};
     if (
       gst &&
       (!p.gstin ||
