@@ -1,4 +1,4 @@
-> Active backend configuration: `https://gvevmnzibhuqnpdfvidl.supabase.co`, supplied by the owner on 9 October 2026. Any earlier project identifiers below describe the original handoff, not the active target. New-project database setup/import is pending authorized access through the correct Supabase account.
+> Active backend configuration: `https://gvevmnzibhuqnpdfvidl.supabase.co`, supplied by the owner on 9 October 2026. Any earlier project identifiers below describe the original handoff, not the active target. Database initialization and the as-supplied workbook import completed with explicit owner approval on 9 October 2026. Verified 185 unchanged historical rows, 33 linked client/site records, and annual sequence floors 17/81/87. Administrator Authentication account setup and website deployment remain pending.
 
 # Aahana Pest Control --- Complete Project Work
 
