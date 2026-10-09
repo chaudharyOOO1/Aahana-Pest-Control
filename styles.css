@@ -17,3 +17,41 @@ main{padding:28px;max-width:1450px;width:100%;margin:auto}.page-head{display:fle
 @media print{body>*{display:none!important}body>#modal{display:block!important;position:static;background:white;padding:0}#modal .modal{width:100%;max-height:none;border:0;box-shadow:none;color:black;background:white}#modal .modal-head button,#modal .modal-foot{display:none!important}#modal .modal-body{display:block;padding:0}.financial-document .table{min-width:0} .financial-document th,.financial-document td{color:black}}
 
 .erp-fields{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}#financialERP input,#financialERP select{max-width:100%}#financialERP pre{white-space:pre-wrap}
+
+/* Keep navigation and financial controls available on phones and tablets. */
+.layout{grid-template-columns:235px minmax(0,1fr)}
+main,.section,.card,.kpi,.field{min-width:0}
+button,input,select,textarea{touch-action:manipulation}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-width:1000px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .sidebar{display:flex;gap:8px;padding:8px 12px;border-right:0;border-bottom:1px solid var(--border);overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;background:var(--surface)}
+  .sidebar .nav{flex-direction:row;flex-shrink:0}
+  .sidebar .nav button{white-space:nowrap;min-height:44px}
+  .nav-title,.sidebar-note{display:none}
+  .card-head,.page-head{gap:12px;flex-wrap:wrap}
+  .card{overflow-x:auto}
+  .erp-fields{grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))}
+}
+@media(max-width:600px){
+  .header{height:auto;min-height:74px;padding:12px;gap:12px;flex-wrap:wrap;position:relative}
+  .brand{min-width:0}.brand h1{font-size:17px}.logo{flex-shrink:0}
+  .top-actions{width:100%;flex-wrap:wrap}.top-actions .btn{flex:1}
+  main{padding:14px;width:100%;margin:0}
+  .page-head h2{font-size:22px}.page-head p{line-height:1.5}
+  .page-head>div,.filters{width:100%;min-width:0}
+  .filters input,.filters select{width:100%;min-width:0}
+  .kpis{gap:8px}.kpi{padding:12px}.kpi .num{font-size:clamp(16px,5vw,24px);overflow-wrap:anywhere}.kpi .label{font-size:10px}
+  .btn,.mini,.nav button{min-height:44px}.mini{font-size:12px;padding:8px 10px}
+  input,select,textarea,.filters input,.filters select{font-size:16px;min-height:44px}
+  .erp-fields{grid-template-columns:minmax(0,1fr)}
+  .erp-fields label{min-width:0;display:grid;gap:6px}.erp-fields input,.erp-fields select{width:100%;min-width:0}
+  .table-wrap{max-width:100%;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  .table th,.table td{padding:10px 12px}.table td button{margin:3px 0}
+  .card-head{padding:12px}.list{padding:6px 12px}.item{flex-wrap:wrap;overflow-wrap:anywhere}.item-side{margin-left:auto}
+  .visit{align-items:flex-start;flex-wrap:wrap}.visit-actions{flex-wrap:wrap}
+  .sync-tools{justify-content:flex-start;padding:10px 12px}.sync-tools .btn{min-height:44px}
+  .modal-back{padding:8px}.modal{max-height:calc(100dvh - 16px);width:100%;overflow:auto}
+  .modal-head,.modal-foot{padding:12px;position:sticky;background:var(--surface);z-index:1}.modal-head{top:0}.modal-foot{bottom:0}
+  .modal-body{padding:12px;min-width:0;overflow-x:auto}.field{min-width:0}
+}

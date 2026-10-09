@@ -365,6 +365,23 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.page.evaluate('payments[0].amount'),50)
         self.assertEqual(self.errors,[])
 
+    def test_mobile_navigation_finance_and_forms(self):
+        self.load()
+        for width in [320,390,768,1024]:
+            self.page.set_viewport_size({'width':width,'height':844})
+            for section in ['clients','billing','financialERP','gst','reports']:
+                button=self.page.locator('.nav button[data-section="'+section+'"]')
+                button.scroll_into_view_if_needed();button.click()
+                self.assertTrue(self.page.locator('#'+section).is_visible())
+                self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= window.innerWidth+1'))
+            self.page.get_by_role('button',name='+ New Client',exact=True).click()
+            self.assertTrue(self.page.locator('#modal').is_visible())
+            box=self.page.locator('#modal .modal').bounding_box()
+            self.assertLessEqual(box['x']+box['width'],width)
+            self.assertGreaterEqual(self.page.locator('#modal .field input').first.evaluate('el=>parseFloat(getComputedStyle(el).fontSize)'),16 if width<=600 else 0)
+            self.page.get_by_role('button',name='Cancel',exact=True).click()
+        self.assertEqual(self.errors,[])
+
     def test_mobile_login_and_missing_library(self):
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.route('https://cdn.jsdelivr.net/**',lambda route:route.abort())
