@@ -53,7 +53,7 @@ module.exports = async function handler(req, res) {
   }
   try {
     const user = await db("/auth/v1/user");
-    if (user.email !== "admin@aahanapestcontrol.com")
+    if (user.email !== "admin@aahanapestcontrol.in")
       return res.status(403).json({ error: "Administrator access required." });
     const org = body.organizationId,
       members = await db(

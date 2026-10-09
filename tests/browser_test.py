@@ -12,7 +12,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 MOCK = r'''
 window.mockWrites=[];window.mockError=false;
-const user={id:'admin-user',email:'admin@aahanapestcontrol.com'};
+const user={id:'admin-user',email:'admin@aahanapestcontrol.in'};
 let listener;let session={user,access_token:'test-token'};
 window.supabase={createClient:()=>({
  auth:{onAuthStateChange:cb=>{listener=cb;queueMicrotask(()=>cb('INITIAL_SESSION',session));return {data:{subscription:{unsubscribe(){}}}}},
@@ -137,7 +137,7 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.page.evaluate('clients.length'),0)
         self.assertEqual(self.page.get_by_text('Create account',exact=True).count(),0)
         self.page.get_by_text('Reset password',exact=True).click()
-        self.page.wait_for_function("window.mockReset==='admin@aahanapestcontrol.com'")
+        self.page.wait_for_function("window.mockReset==='admin@aahanapestcontrol.in'")
         self.assertEqual(self.errors,[])
     def test_clipboard_failure_reports_failure(self):
         self.load()

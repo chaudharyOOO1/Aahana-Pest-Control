@@ -1,4 +1,4 @@
-> Active backend configuration: `https://gvevmnzibhuqnpdfvidl.supabase.co`, supplied by the owner on 9 October 2026. Any earlier project identifiers below describe the original handoff, not the active target. Database initialization and the as-supplied workbook import completed with explicit owner approval on 9 October 2026. Verified 185 unchanged historical rows, 33 linked client/site records, and annual sequence floors 17/81/87. Administrator Authentication account setup and website deployment remain pending.
+> Active backend configuration: `https://gvevmnzibhuqnpdfvidl.supabase.co`, supplied by the owner on 9 October 2026. Any earlier project identifiers below describe the original handoff, not the active target. Database initialization and the as-supplied workbook import completed with explicit owner approval on 9 October 2026. Verified 185 unchanged historical rows, 33 linked client/site records, and annual sequence floors 17/81/87. The verified administrator account is present; website deployment remains pending.
 
 # Aahana Pest Control --- Complete Project Work
 
@@ -38,7 +38,7 @@ Supabase project: - Name: `Aahana Pest Control` - Project ref:
 
 Fixed business-admin account:
 
-`admin@aahanapestcontrol.com`
+`admin@aahanapestcontrol.in`
 
 Implemented: - Fixed admin email - Removed public Create Account flow -
 Sign-in - Password reset - Frontend email restriction - Server-side

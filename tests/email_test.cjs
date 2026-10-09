@@ -69,7 +69,7 @@ async function call(body = {}, auth = "Bearer test", method = "POST") {
     requests.push({ url, options });
     let data;
     if (url.endsWith("/auth/v1/user"))
-      data = { id: "admin-user", email: "admin@aahanapestcontrol.com" };
+      data = { id: "admin-user", email: "admin@aahanapestcontrol.in" };
     else if (url.includes("organization_members"))
       data = [{ organization_id: org }];
     else if (url.includes("/invoices?")) data = [invoice];

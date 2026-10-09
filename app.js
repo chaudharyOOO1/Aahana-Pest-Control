@@ -3,7 +3,7 @@ const SUPABASE_PUBLISHABLE_KEY='sb_publishable_M6bDouk3Ts8Jelfmlnji5A_vkGyJNDK';
 const supabaseClient=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let cloudUser=null,cloudOrgId=null;
 function authStatus(message,error=false){const el=document.getElementById('authStatus');if(el){el.textContent=message;el.style.color=error?'var(--danger)':'var(--muted)'}}
-const ADMIN_EMAIL='admin@aahanapestcontrol.com';
+const ADMIN_EMAIL='admin@aahanapestcontrol.in';
 let sessionStarting=false,recoveryMode=false,sessionEpoch=0;
 function resetWorkspace(){historicalBills=[];erpRecords=[];syncedBaselines={};cloudDirty=false;cloudReady=false;cloudHydrating=false;cloudUser=null;cloudOrgId=null;sessionEpoch++;clearTimeout(cloudSyncTimer);clients=[];visits=[];visitReports=[];plans=[];jobs=[];invoices=[];payments=[];expenses=[];ownerCapital=[];accounts=[];vendors=[];vendorBills=[];vendorPayments=[];document.getElementById('authGate').style.display='flex';document.getElementById('authPassword').value='';}
 async function authSignIn(){
