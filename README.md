@@ -61,6 +61,6 @@ See docs/SYNC.md for record relationships, conflict recovery, and the distinctio
 
 ## Finance workflow
 
-See docs/FINANCE.md for invoice and receipt validation, monthly/current report definitions, opening balance treatment, historical import preparation and the server checks required before deployment. Additional settings from a separate Codex chat must be provided before they can be replicated.
+See docs/FINANCE.md for invoice and receipt validation, monthly/current report definitions, opening balance treatment, uploaded import preparation and the server checks required before deployment. Additional settings from a separate Codex chat must be provided before they can be replicated.
 
 Uploaded invoice integration: source rows stay unchanged in Supabase. A shared read projection uses source-row UUIDs for identity, never the repeated printed invoice number. It does not rewrite cloud invoices or duplicate source imports. Received marks reduce receivables and increase unallocated funds; monthly statements include receipts only where payment dates are supplied. GST submission marks remain separate from government cash payments. Original amount mismatches may produce a visible balance-check difference. Uploaded cancelled/discarded bills stay in the invoice register but are excluded from revenue and dues.
