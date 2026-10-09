@@ -136,7 +136,7 @@
       "</tbody></table></div>";
     let gstCard=document.getElementById('uploadedGST');
     if(!gstCard){gstCard=document.createElement('div');gstCard.id='uploadedGST';gstCard.className='card';document.getElementById('gst').append(gstCard);}
-    gstCard.innerHTML='<div class="card-head"><h3>Uploaded invoice GST submission register</h3></div><p>Submission status is separate from GST cash payments.</p><table class="table"><thead><tr><th>Invoice</th><th>Client</th><th>Service month</th><th>GST</th><th>Submission status</th></tr></thead><tbody>'+historicalBills.map(r=>{const b=r.payload.reported_billing;return '<tr><td>'+h(b.original_invoice_number)+'</td><td>'+h(b.client_site)+'</td><td>'+h(b.service_month)+'</td><td>'+recorded(b.gst_recorded)+'</td><td>'+h(b.gst_status_recorded||'Not recorded')+'</td></tr>';}).join('')+'</tbody></table>';
+    gstCard.innerHTML='<div class="card-head"><h3>Uploaded invoice GST submission register</h3></div><p>Submission status is separate from GST cash payments.</p><table class="table"><thead><tr><th>Invoice</th><th>Client</th><th>Service month</th><th>GST</th><th>Submission status</th></tr></thead><tbody>'+historicalBills.map(r=>{const b=r.payload.reported_billing;return '<tr><td>'+h(b.original_invoice_number)+'</td><td>'+h(b.client_site)+'</td><td>'+h(b.service_month)+'</td><td>'+recorded(financialSnapshot().invoices.find(i=>i.source_id===r.id)?.gst??b.gst_recorded)+'</td><td>'+h(b.gst_status_recorded||'Not recorded')+'</td></tr>';}).join('')+'</tbody></table>';
     document.getElementById("historyClient").value = clientFilter;
     document.getElementById("historyYear").value = yearFilter;
   }

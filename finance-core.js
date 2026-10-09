@@ -46,9 +46,10 @@
       const b=r.payload.reported_billing, notes=JSON.stringify([b.unlabelled_notes,b.source_fields]);
       return {id:'import-'+r.id,source_id:r.id,source_key:r.source_key,imported:true,client:r.client,no:b.original_invoice_number,date:b.invoice_date||'',taxable:b.taxable_recorded,gst:b.gst_recorded,total:b.total_recorded,void:/discarded|invoice cancel(?:ed|led)/i.test(notes),billing:{serviceMonth:b.service_month,sourceFY:b.source_financial_year},paymentStatus:b.payment_status_recorded,gstStatus:b.gst_status_recorded,reviewIssues:b.review_issues||[]};
     });
+    for(const i of imported){const edit=(data.erpRecords||[]).find(r=>r.kind==='invoice_adjustment'&&r.key==='source:'+i.source_id);if(edit?.data.override)Object.assign(i,edit.data.override);}
     const receipts=imported.filter(i=>!i.void&&/^received$/i.test(i.paymentStatus||'')&&Number.isFinite(i.total)).map(i=>{
       const b=rows.find(r=>r.id===i.source_id).payload.reported_billing;
-      return {id:'import-receipt-'+i.source_id,invoice:i.id,amount:i.total,date:b.payment_date_recorded||'',mode:'Unallocated receipts',receipt:'Workbook · '+i.no,imported:true,source_id:i.source_id};
+      return {id:'import-receipt-'+i.source_id,invoice:i.id,amount:b.total_recorded,date:b.payment_date_recorded||'',mode:'Unallocated receipts',receipt:'Workbook · '+i.no,imported:true,source_id:i.source_id};
     });
     return {...data,invoices:[...data.invoices,...imported],payments:[...data.payments,...receipts],accounts:receipts.length?[...data.accounts,{id:'unallocated-import',name:'Unallocated receipts',type:'Unallocated',opening:0}]:data.accounts};
   }

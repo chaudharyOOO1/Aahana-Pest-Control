@@ -48,6 +48,7 @@ do $$begin
  begin insert into erp_records(organization_id,kind,record_key,payload) values('00000000-0000-4000-8000-000000000002','company_profile','company','{}');raise exception 'cross-org insert accepted';exception when insufficient_privilege then null;end;
  begin insert into payments values(gen_random_uuid(),'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000004',current_date+1,1,'REC-003');raise exception 'future payment accepted';exception when raise_exception then if SQLERRM<>'Payment date must fall between invoice date and today' then raise;end if;end;
 end $$;
+do $$begin begin update public.invoices set total=49 where id='00000000-0000-4000-8000-000000000004';raise exception 'Invoice edit below receipts accepted';exception when raise_exception then if SQLERRM<>'Invoice total cannot be below recorded receipts' then raise;end if;end;end$$;
 select 'Migration checks passed: payment limits, receipt uniqueness, payment dates and organization isolation.';
 """
 try:

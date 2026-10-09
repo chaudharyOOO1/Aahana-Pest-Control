@@ -382,6 +382,37 @@ class BrowserTests(unittest.TestCase):
             self.page.get_by_role('button',name='Cancel',exact=True).click()
         self.assertEqual(self.errors,[])
 
+    def test_invoice_edit_native_sync_and_print(self):
+        self.load()
+        self.page.evaluate("InvoiceEditor.open(1)")
+        self.assertTrue(self.page.locator('#ieNumber').is_disabled() or self.page.locator('#ieNumber').evaluate('el=>el.readOnly'))
+        for key,value in {'ieTaxable':'200','ieGST':'36','ieTotal':'236','ieDescription':'Updated service','ieReason':'Corrected service value'}.items():self.page.locator('#'+key).fill(value)
+        self.page.locator('#ieSplit').select_option('cgst_sgst')
+        self.page.get_by_role('button',name='Save changes',exact=True).click()
+        self.page.wait_for_function('!cloudDirty')
+        self.assertEqual(self.page.evaluate('invoices[0].total'),236)
+        self.assertEqual(self.page.evaluate("erpRecords.find(r=>r.kind==='invoice_adjustment').data.revisions[0].reason"),'Corrected service value')
+        self.page.add_init_script('window.mockRows='+json.dumps(self.page.evaluate('mockRows'))+';');self.page.reload();self.page.wait_for_function('cloudReady')
+        self.assertEqual(self.page.evaluate('invoices[0].total'),236)
+        self.page.evaluate('InvoiceEditor.preview(1)')
+        self.assertIn('Updated service',self.page.locator('#modalBody').inner_text())
+        self.assertIn('CGST',self.page.locator('#modalBody').inner_text())
+        self.assertIn('SGST',self.page.locator('#modalBody').inner_text())
+        self.assertEqual(self.errors,[])
+
+    def test_uploaded_invoice_edit_preserves_source_and_receipt(self):
+        self.load()
+        self.page.evaluate("""()=>{historicalBills=[{id:'00000000-0000-4000-8000-000000000099',source_key:'source!2',client:1,payload:{cells:[],reported_billing:{original_invoice_number:'UT/25-26/01',source_financial_year:'26-27',service_month:'2026-04',invoice_date:null,taxable_recorded:1250,gst_recorded:225,total_recorded:1475,payment_status_recorded:'Received',payment_date_recorded:null,review_issues:[]}}}];renderAll();InvoiceEditor.open('import-00000000-0000-4000-8000-000000000099')}""")
+        for key,value in {'ieTaxable':'1500','ieGST':'270','ieTotal':'1770','ieReason':'Updated service charge'}.items():self.page.locator('#'+key).fill(value)
+        self.page.locator('#ieSplit').select_option('igst')
+        self.page.get_by_role('button',name='Save changes',exact=True).click()
+        self.page.wait_for_function('!cloudDirty')
+        self.assertEqual(self.page.evaluate('historicalBills[0].payload.reported_billing.total_recorded'),1475)
+        self.assertEqual(self.page.evaluate("financialSnapshot().invoices.find(i=>i.imported).total"),1770)
+        self.assertEqual(self.page.evaluate("financialSnapshot().payments.find(p=>p.imported).amount"),1475)
+        self.assertEqual(self.page.evaluate("AahanaFinance.outstandingFor(financialSnapshot().invoices.find(i=>i.imported),financialSnapshot().payments)"),295)
+        self.assertEqual(self.errors,[])
+
     def test_mobile_login_and_missing_library(self):
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.route('https://cdn.jsdelivr.net/**',lambda route:route.abort())

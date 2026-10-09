@@ -17,6 +17,7 @@ jobs:
       - run: node --check finance-core.js
       - run: node --check erp.js
       - run: node --check history.js
+      - run: node --check invoice-editor.js
       - run: node --check api/send-invoices.js
       - run: node tests/finance_test.cjs
       - run: node tests/erp_test.cjs
