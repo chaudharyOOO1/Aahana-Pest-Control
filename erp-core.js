@@ -110,7 +110,7 @@
     const within = (row) => String(row.date).slice(0, 7) === month;
     const revenue = F.sum(
         data.invoices.filter(
-          (i) => (i.billing?.serviceMonth || i.date.slice(0, 7)) === month,
+          (i) => !i.void && (i.billing?.serviceMonth || i.date.slice(0, 7)) === month,
         ),
         "taxable",
       ),
@@ -135,10 +135,10 @@
       through = { ...data };
     for (const key of dated) {
       before[key] = (data[key] || []).filter(
-        (r) => String(r.date).slice(0, 7) < month,
+        (r) => F.validDate(r.date) && String(r.date).slice(0, 7) < month,
       );
       through[key] = (data[key] || []).filter(
-        (r) => String(r.date).slice(0, 7) <= month,
+        (r) => F.validDate(r.date) && String(r.date).slice(0, 7) <= month,
       );
     }
     const totalBalances = (d) =>

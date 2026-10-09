@@ -21,7 +21,7 @@
     if (!row) return;
     const b = row.payload.reported_billing;
     showDocument(
-      "Historical bill · " + b.original_invoice_number,
+      "Uploaded invoice · " + b.original_invoice_number,
       "<h2>" +
         h(b.client_site) +
         "</h2><p>Original issued number: " +
@@ -74,7 +74,7 @@
         "amount",
       );
     s.innerHTML =
-      '<div class="page-head"><div><h2>Historical billing</h2><p>Workbook records imported as supplied, linked to clients. Cash accounts and payment dates are not inferred.</p></div></div><div class="modal-body erp-fields"><label>Client<select id="historyClient" onchange="History.filter()"><option value="">All clients</option>' +
+      '<div class="page-head"><div><h2>Uploaded invoice source</h2><p>Workbook records imported as supplied, linked to clients. Cash accounts and payment dates are not inferred.</p></div></div><div class="modal-body erp-fields"><label>Client<select id="historyClient" onchange="History.filter()"><option value="">All clients</option>' +
       clients
         .map((c) => '<option value="' + c.id + '">' + h(c.name) + "</option>")
         .join("") +
@@ -96,7 +96,7 @@
             "</div></div>",
         )
         .join("") +
-      '</div><p>These are unreconciled source subtotals, including rows marked discarded. “Received” and “Submitted” are source statuses, not posted cash receipts or verified tax filings. Live accounting statements currently cover posted ERP transactions.</p><div class="table-wrap"><table class="table"><thead><tr><th>Source FY / invoice</th><th>Client</th><th>Service month / invoice date</th><th>Taxable</th><th>GST</th><th>Total</th><th>Payment status / date</th><th>GST status</th><th>Source / review</th></tr></thead><tbody>' +
+      '</div><p>Uploaded invoices are included in Billing, Accounting, GST and Reports. Cancelled/discarded bills remain visible but are excluded from financial totals. Received amounts are held under Unallocated receipts until their account is known; missing payment dates are excluded from dated cash-flow periods. Submitted GST status is preserved separately from GST cash payments.</p><div class="table-wrap"><table class="table"><thead><tr><th>Source FY / invoice</th><th>Client</th><th>Service month / invoice date</th><th>Taxable</th><th>GST</th><th>Total</th><th>Payment status / date</th><th>GST status</th><th>Source / review</th></tr></thead><tbody>' +
       rows
         .map((r) => {
           const b = r.payload.reported_billing;
@@ -134,6 +134,9 @@
         })
         .join("") +
       "</tbody></table></div>";
+    let gstCard=document.getElementById('uploadedGST');
+    if(!gstCard){gstCard=document.createElement('div');gstCard.id='uploadedGST';gstCard.className='card';document.getElementById('gst').append(gstCard);}
+    gstCard.innerHTML='<div class="card-head"><h3>Uploaded invoice GST submission register</h3></div><p>Submission status is separate from GST cash payments.</p><table class="table"><thead><tr><th>Invoice</th><th>Client</th><th>Service month</th><th>GST</th><th>Submission status</th></tr></thead><tbody>'+historicalBills.map(r=>{const b=r.payload.reported_billing;return '<tr><td>'+h(b.original_invoice_number)+'</td><td>'+h(b.client_site)+'</td><td>'+h(b.service_month)+'</td><td>'+recorded(b.gst_recorded)+'</td><td>'+h(b.gst_status_recorded||'Not recorded')+'</td></tr>';}).join('')+'</tbody></table>';
     document.getElementById("historyClient").value = clientFilter;
     document.getElementById("historyYear").value = yearFilter;
   }
@@ -143,7 +146,7 @@
   section.className = "section";
   document.querySelector("main").append(section);
   const button = document.createElement("button");
-  button.textContent = "Historical billing";
+  button.textContent = "Uploaded invoice source";
   button.dataset.section = "historicalBilling";
   button.onclick = () => {
     document

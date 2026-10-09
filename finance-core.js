@@ -17,7 +17,7 @@
     return {taxable,gst:rupees(gstPaise),total:rupees(paise(taxable)+gstPaise)};
   }
   function paidFor(invoiceId,payments){return sum(payments.filter(p=>p.invoice===invoiceId),'amount')}
-  function outstandingFor(invoice,payments){return rupees(Math.max(0,paise(invoice.total)-paise(paidFor(invoice.id,payments))))}
+  function outstandingFor(invoice,payments){if(invoice.void)return 0;return rupees(Math.max(0,paise(invoice.total)-paise(paidFor(invoice.id,payments))))}
   function nextNumber(rows,field,prefix){
     const used=new Set(rows.map(row=>String(row[field]||'').trim().toUpperCase()));
     let max=0;
@@ -40,7 +40,20 @@
     post(data.ownerCapital,'mode',1);post(data.payments,'mode',1);post(data.expenses,'account',-1);post(data.vendorPayments,'mode',-1);post(data.taxPayments||[],'mode',-1);post((data.accountTransfers||[]).map(r=>({...r,mode:r.from_mode})),'mode',-1);post((data.accountTransfers||[]).map(r=>({...r,mode:r.to_mode})),'mode',1);
     return Object.fromEntries(Object.entries(balances).map(([id,value])=>[id,rupees(value)]));
   }
+  function importedData(data){
+    const rows=data.historicalBills||[], invoiceIds=new Set(data.invoices.map(i=>i.source_key).filter(Boolean));
+    const imported=rows.filter(r=>!invoiceIds.has(r.source_key)).map(r=>{
+      const b=r.payload.reported_billing, notes=JSON.stringify([b.unlabelled_notes,b.source_fields]);
+      return {id:'import-'+r.id,source_id:r.id,source_key:r.source_key,imported:true,client:r.client,no:b.original_invoice_number,date:b.invoice_date||'',taxable:b.taxable_recorded,gst:b.gst_recorded,total:b.total_recorded,void:/discarded|invoice cancel(?:ed|led)/i.test(notes),billing:{serviceMonth:b.service_month,sourceFY:b.source_financial_year},paymentStatus:b.payment_status_recorded,gstStatus:b.gst_status_recorded,reviewIssues:b.review_issues||[]};
+    });
+    const receipts=imported.filter(i=>!i.void&&/^received$/i.test(i.paymentStatus||'')&&Number.isFinite(i.total)).map(i=>{
+      const b=rows.find(r=>r.id===i.source_id).payload.reported_billing;
+      return {id:'import-receipt-'+i.source_id,invoice:i.id,amount:i.total,date:b.payment_date_recorded||'',mode:'Unallocated receipts',receipt:'Workbook · '+i.no,imported:true,source_id:i.source_id};
+    });
+    return {...data,invoices:[...data.invoices,...imported],payments:[...data.payments,...receipts],accounts:receipts.length?[...data.accounts,{id:'unallocated-import',name:'Unallocated receipts',type:'Unallocated',opening:0}]:data.accounts};
+  }
   function summary(data){
+    data={...data,invoices:data.invoices.filter(i=>!i.void)};
     const billed=sum(data.invoices,'total'),collected=sum(data.payments,'amount'),outstanding=sum(data.invoices,i=>outstandingFor(i,data.payments));
     const gstCollected=sum(data.invoices,'gst'),expenseGross=sum(data.expenses,'amount'),expenseGST=sum(data.expenses,'gst');
     const vendorBilled=sum(data.vendorBills,'amount'),vendorPaid=sum(data.vendorPayments,'amount'),vendorGST=sum(data.vendorBills,'gst');
@@ -52,6 +65,6 @@
     const balanceCheck=rupees(paise(assets)-paise(liabilities)-paise(equity));
     return {billed,collected,outstanding,gstCollected,expenseGross,expenseGST,vendorBilled,vendorPaid,vendorGST,revenue,operatingExpenses,profit,inputGST,netGST,receivable,payable,capital,cash,assets,equity,liabilities,balanceCheck};
   }
-  const api={paise,rupees,sum,parseAmount,invoiceAmounts,paidFor,outstandingFor,nextNumber,validDate,resolveAccount,accountBalances,summary};
+  const api={importedData,paise,rupees,sum,parseAmount,invoiceAmounts,paidFor,outstandingFor,nextNumber,validDate,resolveAccount,accountBalances,summary};
   root.AahanaFinance=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

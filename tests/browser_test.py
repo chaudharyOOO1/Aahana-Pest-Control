@@ -279,15 +279,21 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.page.evaluate('mockRPC'),'bootstrap_aahana_workspace')
         self.assertEqual(self.errors,[])
 
-    def test_historical_billing_preserves_values_and_does_not_post_cash(self):
+    def test_uploaded_billing_integrates_finance_and_preserves_source(self):
         self.load()
         self.page.evaluate("""() => {
           historicalBills=[{id:'00000000-0000-4000-8000-000000000099',client:1,source_key:'Billing 26-27!2',payload:{cells:[{header:'GST',original_value:226},{header:'Notes',original_value:'<img src=x onerror=window.pwned=1>'}],reported_billing:{client_site:'Historical client',source_financial_year:'26-27',original_invoice_number:'UT/25-26/01',service_month:'2026-04',invoice_date:null,taxable_recorded:1250,gst_recorded:226,total_recorded:1475,payment_status_recorded:'Received',payment_date_recorded:null,gst_status_recorded:'Submitted',review_issues:['Amount mismatch']}}}];renderAll();
         }""")
-        self.page.get_by_role('button',name='Historical billing',exact=True).click()
+        self.page.get_by_role('button',name='Uploaded invoice source',exact=True).click()
         self.assertIn('UT/25-26/01',self.page.locator('#historicalBilling').inner_text())
         self.assertIn('1,475',self.page.locator('#historicalBilling').inner_text())
         self.assertEqual(self.page.evaluate('payments.length'),0)
+        self.assertIn('UT/25-26/01',self.page.locator('#billingRows').inner_text())
+        self.assertIn('1,350',self.page.locator('#aRevenue').inner_text())
+        self.assertIn('Unallocated receipts',self.page.locator('#accountRows').inner_text())
+        self.assertEqual(self.page.evaluate('AahanaFinance.summary(financialSnapshot()).collected'),1475)
+        self.assertEqual(self.page.evaluate('AahanaFinance.summary(financialSnapshot()).receivable'),118)
+        self.assertIn('UT/25-26/01',self.page.locator('#financialERP').inner_text())
         self.page.get_by_role('button',name='Source details',exact=True).click()
         self.assertIn('226',self.page.locator('#modalBody').inner_text())
         self.assertEqual(self.page.locator('#modalBody img').count(),0)

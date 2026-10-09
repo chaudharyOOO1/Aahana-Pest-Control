@@ -55,7 +55,7 @@
   }
   function data() {
     return {
-      ...localSnapshot(),
+      ...financialSnapshot(),
       taxPayments: records("tax_payment").map((r) => r.data),
       accountTransfers: records("account_transfer").map((r) => r.data),
     };
@@ -154,7 +154,7 @@
     if (!c || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !F.validDate(date))
       throw Error("Select a valid client, service month and invoice date.");
     if (
-      invoices.some(
+      data().invoices.some(
         (i) =>
           i.client === clientId &&
           (i.billing?.serviceMonth || i.date.slice(0, 7)) === month,
@@ -441,7 +441,7 @@
       if (status === "filed" && (!reference || !F.validDate(date)))
         throw Error("A filed return needs a reference and filing date.");
       const output = F.sum(
-          invoices.filter((i) => i.date.slice(0, 7) === month),
+          data().invoices.filter((i) => !i.void && (i.date.slice(0, 7)||i.billing?.serviceMonth) === month),
           "gst",
         ),
         inputGST = F.sum(
@@ -765,7 +765,7 @@
             "</div></div>",
         )
         .join("") +
-      '</div><div class="grid"><div class="card"><div class="card-head"><h3>Cash-flow statement · ' +
+      '</div><p>Uploaded bills and recorded Received amounts are included. Unallocated receipts have no confirmed bank/cash account. Receipts with missing dates are included in total funds but excluded from dated cash-flow statements; reconcile their dates and accounts against bank statements. Source amount discrepancies remain visible in invoice details and the balance check.</p><div class="grid"><div class="card"><div class="card-head"><h3>Cash-flow statement · ' +
       viewMonth +
       '</h3></div><div class="list">' +
       [
@@ -865,6 +865,7 @@
             '])">Send</button></td></tr>',
         )
         .join("") +
+      d.invoices.filter(i=>i.imported).map(i=>'<tr><td>Uploaded</td><td>'+h(i.no)+'</td><td>'+h(i.billing.serviceMonth)+'</td><td>'+h(clientName(i.client))+'</td><td>'+h(i.void?'Cancelled':i.paymentStatus||'Payment status not recorded')+'</td><td>'+(i.total==null?'Not recorded':money(i.total))+'</td><td><button class="mini" onclick="History.preview(\''+h(i.source_id)+'\')">Invoice details</button></td></tr>').join('') +
       '</tbody></table></div></div><div class="card" style="margin-top:16px"><div class="card-head"><h3>GST filing and separate GST payments</h3></div><div class="modal-body erp-fields">' +
       input("eGSTMonth", "Return period", viewMonth, "month") +
       '<div class="field"><label for="eGSTStatus">Submission status</label><select id="eGSTStatus"><option value="draft">Draft / not submitted</option><option value="filed">Submitted</option></select></div>' +
@@ -969,7 +970,7 @@
       "accountTransfers",
     ])
       cutoff[key] = (d[key] || []).filter(
-        (r) => r.date.slice(0, 7) <= viewMonth,
+        (r) => (r.date || r.billing?.serviceMonth || "9999").slice(0, 7) <= viewMonth,
       );
     const balance = F.summary(cutoff),
       balances = F.accountBalances(cutoff);

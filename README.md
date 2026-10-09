@@ -12,7 +12,7 @@ Operations and management accounting app with a static frontend and authenticate
 - Monthly P&L, cash flow, funds by account, balance-sheet reports, separate GST filings/payments and reviewed bank CSV imports.
 - Printable invoice/receipt summaries and shared calculations in integer paise.
 - GST, P&L and balance-sheet management summaries.
-- Read-only historical billing linked to clients, preserving source numbers, discrepancies and missing fields without creating unverified cash movements.
+- Uploaded invoices linked to clients and integrated into Billing, Accounting, GST and Reports; original numbers, source discrepancies and missing fields are preserved.
 - Organization-scoped cloud persistence, visible sync status, retry and recovery of unsynced browser changes.
 - Manual WhatsApp message preparation. Automated sending and incoming webhooks remain future work.
 
@@ -44,9 +44,9 @@ Tests use local fixtures and a simulated Supabase adapter without production wri
 
 ## Deployment and limits
 
-Serve the frontend scripts and styles together. Invoice sending needs the Node endpoint under api/ and the server configuration in .env.example. A Vercel configuration is included; no deployment was created in this session.
+Serve the frontend scripts and styles together. Invoice sending needs the Node endpoint under api/ and the server configuration in .env.example. A Vercel configuration is included; the app is deployed at https://aahana-pest-control-fortellus.vercel.app in the Fortellus team, linked to GitHub main.
 
-Live service connections and deployment are deferred until the GitHub app is ready. Production login, RLS, bootstrap, password-email delivery and real cloud writes remain unverified. No production business records were changed during development or testing.
+The GitHub-linked Vercel deployment is active. Production login, RLS, bootstrap, password-email delivery and real cloud writes remain unverified. No production business records were changed during development or testing.
 
 The financial screens are management summaries, not formal double-entry bookkeeping. Automatic recurring visit generation, automated WhatsApp, technician roles and a formal ledger remain future work.
 
@@ -62,3 +62,5 @@ See docs/SYNC.md for record relationships, conflict recovery, and the distinctio
 ## Finance workflow
 
 See docs/FINANCE.md for invoice and receipt validation, monthly/current report definitions, opening balance treatment, historical import preparation and the server checks required before deployment. Additional settings from a separate Codex chat must be provided before they can be replicated.
+
+Uploaded invoice integration: source rows stay unchanged in Supabase. A shared read projection uses source-row UUIDs for identity, never the repeated printed invoice number. It does not rewrite cloud invoices or duplicate source imports. Received marks reduce receivables and increase unallocated funds; monthly statements include receipts only where payment dates are supplied. GST submission marks remain separate from government cash payments. Original amount mismatches may produce a visible balance-check difference. Uploaded cancelled/discarded bills stay in the invoice register but are excluded from revenue and dues.
